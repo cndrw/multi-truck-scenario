@@ -23,11 +23,14 @@ find_package(std_msgs REQUIRED)
 find_package(nav_msgs REQUIRED)
 
 add_executable(map_node src/map.cpp)
+add_executable(vehicle_node src/vehicle.cpp)
 
 ament_target_dependencies(map_node rclcpp nav_msgs)
+ament_target_dependencies(vehicle_node rclcpp geometry_msgs)
 
 install(TARGETS
   map_node
+  vehicle_node
   DESTINATION lib/${PROJECT_NAME})
 
 if(BUILD_TESTING)
