@@ -23,11 +23,16 @@ find_package(std_msgs REQUIRED)
 find_package(nav_msgs REQUIRED)
 
 add_executable(run_test src/test.cpp)
+add_executable(test_vehicle src/node_vehicle.cpp)
+
 
 ament_target_dependencies(run_test rclcpp std_msgs nav_msgs)
+ament_target_dependencies(test_vehicle rclcpp std_msgs nav_msgs)
+
 
 install(TARGETS
   run_test
+  test_vehicle
   DESTINATION lib/${PROJECT_NAME})
 
 if(BUILD_TESTING)
