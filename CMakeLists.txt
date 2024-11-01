@@ -22,16 +22,16 @@ find_package(rclcpp REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(nav_msgs REQUIRED)
 
-add_executable(run_test src/test.cpp)
+add_executable(map_node src/map.cpp)
 add_executable(test_vehicle src/node_vehicle.cpp)
 
 
-ament_target_dependencies(run_test rclcpp std_msgs nav_msgs)
+ament_target_dependencies(map_node rclcpp std_msgs nav_msgs)
 ament_target_dependencies(test_vehicle rclcpp std_msgs nav_msgs)
 
 
 install(TARGETS
-  run_test
+  map_node
   test_vehicle
   DESTINATION lib/${PROJECT_NAME})
 
