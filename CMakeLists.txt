@@ -31,16 +31,20 @@ rosidl_generate_interfaces(${PROJECT_NAME}
 
 # Ausführbares Ziel
 add_executable(map_node src/map.cpp)
+add_executable(vehicle_node src/vehicle.cpp)
 
 # Abhängigkeiten setzen
 ament_target_dependencies(map_node rclcpp nav_msgs)
+ament_target_dependencies(vehicle_node rclcpp geometry_msgs)
 rosidl_target_interfaces(map_node ${PROJECT_NAME} "rosidl_typesupport_cpp")
+
 
 # Installation
 install(TARGETS
   map_node
-  DESTINATION lib/${PROJECT_NAME}
-)
+  vehicle_node
+  DESTINATION lib/${PROJECT_NAME})
+
 
 # Testen
 if(BUILD_TESTING)
