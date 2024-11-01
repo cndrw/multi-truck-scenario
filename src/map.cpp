@@ -6,7 +6,6 @@
 #include "rclcpp/rclcpp.hpp"
 #include "nav_msgs/msg/occupancy_grid.hpp"
 
-
 using namespace std::chrono_literals;
 
 class Map : public rclcpp::Node
@@ -17,7 +16,7 @@ class Map : public rclcpp::Node
     {
         m_grid_pub = this->create_publisher<nav_msgs::msg::OccupancyGrid>("map_data", 10);
         timer_ = this->create_wall_timer(
-          500ms, std::bind(&Map::timer_callback, this)
+          send_frequenzy, std::bind(&Map::timer_callback, this)
         );
     }
 
@@ -50,6 +49,7 @@ class Map : public rclcpp::Node
         m_grid_pub->publish(grid);
     }
 
+    std::chrono::milliseconds send_frequenzy = 500ms;
     rclcpp::TimerBase::SharedPtr timer_;
     rclcpp::Publisher<nav_msgs::msg::OccupancyGrid>::SharedPtr m_grid_pub;
 };
