@@ -18,9 +18,9 @@ class Vehicle : public rclcpp::Node
         position_pub_ = this->create_publisher<geometry_msgs::msg::Point>("vehicle_position", 10);
 
         // Initialisiere Position
-        self.position_.x = 0.0;
-        self.position_.y = 0.0;
-        self.position_.z = 0.0;
+        position_.x = 0.0;
+        position_.y = 0.0;
+        position_.z = 0.0;
 
         // Timer, der die Position alle 100 ms veröffentlicht
         timer_ = this->create_wall_timer(
@@ -40,14 +40,14 @@ class Vehicle : public rclcpp::Node
         void publish_position()
         {
             // Veröffentlichen der aktuellen Position
-            RCLPP_INFO(this->get_logger(), "Aktuelle Position: (%.2f, %.2f, %.2f)", self.position_.x, self.position_.y, self.position_.z);
+            RCLCPP_INFO(this->get_logger(), "Aktuelle Position: (%.2f, %.2f, %.2f)", position_.x, position_.y, position_.z);
             position_pub_->publish(position_);
         }
 
         geometry_msgs::msg::Point position_;
         rclcpp::TimerBase::SharedPtr timer_;
         rclcpp::Publisher<geometry_msgs::msg::Point>::SharedPtr position_pub_;
-}
+};
 
 int main(int argc, char * argv[])
 {
