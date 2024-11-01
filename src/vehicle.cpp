@@ -41,10 +41,10 @@ class Vehicle : public rclcpp::Node
         {
             // Veröffentlichen der aktuellen Position
             RCLCPP_INFO(this->get_logger(), "Aktuelle Position: (%.2f, %.2f, %.2f)", position_.x, position_.y, position_.z);
-            position_pub_->publish(position_);
+            position_pub_->publish(m_position);
         }
 
-        geometry_msgs::msg::Point position_;
+        geometry_msgs::msg::Point m_position;
         rclcpp::TimerBase::SharedPtr timer_;
         rclcpp::Publisher<geometry_msgs::msg::Point>::SharedPtr position_pub_;
 };
