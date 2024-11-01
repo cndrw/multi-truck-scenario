@@ -5,10 +5,10 @@ from launch_ros.actions import Node
 def generate_launch_description():
     
     vehicles = [
-        {'name': 'vehicle_1', 'position_x': 0, 'position_y': 0, 'direction': 0},
-        {'name': 'vehicle_2', 'position_x': 1, 'position_y': 0, 'direction': 90},
-        {'name': 'vehicle_3', 'position_x': 2, 'position_y': 1, 'direction': 180},
-        {'name': 'vehicle_4', 'position_x': 3, 'position_y': 1, 'direction': 270},
+        {'name': 'vehicle_1', 'vin': 0, 'speed': 0, 'indicator': 0, 'position_x': 0, 'position_y': 0, 'position_z': 0, 'direction_x': 0, 'direction_y': 0, 'direction_z': 0},
+        {'name': 'vehicle_2', 'vin': 1, 'speed': 0, 'indicator': 0, 'position_x': 1, 'position_y': 0, 'position_z': 0, 'direction_x': 0, 'direction_y': 0, 'direction_z': 0},
+        {'name': 'vehicle_3', 'vin': 2, 'speed': 0, 'indicator': 0, 'position_x': 2, 'position_y': 1, 'position_z': 0, 'direction_x': 0, 'direction_y': 0, 'direction_z': 0},
+        {'name': 'vehicle_4', 'vin': 3, 'speed': 0, 'indicator': 0, 'position_x': 3, 'position_y': 1, 'position_z': 0, 'direction_x': 0, 'direction_y': 0, 'direction_z': 0},
         # Add more vehicles as needed
     ]
 
@@ -20,12 +20,15 @@ def generate_launch_description():
                 executable='vehicle_node',
                 name=vehicle['name'],
                 parameters=[{
-                    'FIN': 0,
-                    'speed_V': 0,
-                    'Blinker': 0,
+                    'vin': vehicle['vin'],
+                    'speed': vehicle['speed'],
+                    'indicator_state': vehicle['indicator'],
                     'position_x': vehicle['position_x'],
                     'position_y': vehicle['position_y'],
-                    'direction': vehicle['direction']
+                    'position_z': vehicle['position_z'],
+                    'direction_x': vehicle['direction_x'],
+                    'direction_y': vehicle['direction_y'],
+                    'direction_z': vehicle['direction_z']
                 }]
             )
         )
