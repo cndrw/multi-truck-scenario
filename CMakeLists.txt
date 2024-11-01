@@ -23,16 +23,16 @@ find_package(std_msgs REQUIRED)
 find_package(nav_msgs REQUIRED)
 
 add_executable(map_node src/map.cpp)
-add_executable(test_vehicle src/node_vehicle.cpp)
+add_executable(vehicle_node src/node_vehicle.cpp)
 
 
 ament_target_dependencies(map_node rclcpp std_msgs nav_msgs)
-ament_target_dependencies(test_vehicle rclcpp std_msgs nav_msgs)
+ament_target_dependencies(vehicle_node rclcpp std_msgs nav_msgs)
 
 
 install(TARGETS
   map_node
-  test_vehicle
+  vehicle_node
   DESTINATION lib/${PROJECT_NAME})
 
 if(BUILD_TESTING)
@@ -47,3 +47,8 @@ if(BUILD_TESTING)
 endif()
 
 ament_package()
+
+install(
+  DIRECTORY launch
+  DESTINATION share/${PROJECT_NAME}
+)
