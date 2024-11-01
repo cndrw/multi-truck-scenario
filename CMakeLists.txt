@@ -22,12 +22,12 @@ find_package(rclcpp REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(nav_msgs REQUIRED)
 
-add_executable(run_test src/test.cpp)
+add_executable(map_node src/map.cpp)
 
-ament_target_dependencies(run_test rclcpp std_msgs nav_msgs)
+ament_target_dependencies(map_node rclcpp nav_msgs)
 
 install(TARGETS
-  run_test
+  map_node
   DESTINATION lib/${PROJECT_NAME})
 
 if(BUILD_TESTING)
