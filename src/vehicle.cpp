@@ -12,9 +12,10 @@ using namespace std::chrono_literals;
 class Vehicle : public rclcpp::Node
 {
   public:
-    Vehicle() : rclcpp::Node("Vehicle")
-
+    Vehicle() : rclcpp::Node("vehicle")
     {
+        
+        handle_parameters();
         position_pub_ = this->create_publisher<geometry_msgs::msg::Point>("vehicle_position", 10);
 
         // Initialisiere Position
@@ -26,6 +27,33 @@ class Vehicle : public rclcpp::Node
         timer_ = this->create_wall_timer(
             100ms, std::bind(&Vehicle::publish_position, this)
         );
+    }
+
+    void handle_parameters()
+    {
+        this->declare_parameter("position_x", 0.0);
+        this->declare_parameter("position_y", 0.0);
+        this->declare_parameter("position_z", 0.0);
+        this->declare_parameter("direction_x", 0.0);
+        this->declare_parameter("direction_y", 0.0);
+        this->declare_parameter("direction_z", 0.0);
+        this->declare_parameter("vin", 0);
+        this->declare_parameter("speed", 0.0);
+        this->declare_parameter("indicator_state", 0);
+
+        auto pos_point = geometry_msgs::msg::Point();
+        pos_point.x = this->get_parameter("position_x").as_double();
+        pos_point.x = this->get_parameter("position_y").as_double();
+        pos_point.x = this->get_parameter("position_z").as_double();
+
+        auto dir_point = geometry_msgs::msg::Point();
+        dir_point.x = this->get_parameter("direction_x").as_double();
+        dir_point.x = this->get_parameter("direction_y").as_double();
+        dir_point.x = this->get_parameter("direction_z").as_double();
+
+        int vin = this->get_parameter("vin").as_int();
+        double speed = this->get_parameter("speed").as_double();
+        int indicator_state = this->get_parameter("indicator_state").as_int();
     }
 
     void set_position(double x, double y, double z)
