@@ -6,8 +6,9 @@
 #include "rclcpp/rclcpp.hpp"
 #include "nav_msgs/msg/occupancy_grid.hpp"
 
-
 using namespace std::chrono_literals;
+
+enum Indicator{off, left, right, warning};
 
 class Vehicle : public rclcpp::Node
 {
@@ -16,15 +17,18 @@ class Vehicle : public rclcpp::Node
     {
         
         handle_parameters();
-        position_pub_ = this->create_publisher<geometry_msgs::msg::Point>("vehicle_position", 10);
+        m_position_pub = this->create_publisher<geometry_msgs::msg::Point>("vehicle_position", 10);
 
         // Initialisiere Position
         m_position.x = 0.0;
         m_position.y = 0.0;
         m_position.z = 0.0;
+        m_speed = 0.0; //Speed in m/s
+        m_direction = 0.0; //Richtung in Grad
+        m_vin = 0;
 
         // Timer, der die Position alle 100 ms veröffentlicht
-        timer_ = this->create_wall_timer(
+        m_timer = this->create_wall_timer(
             100ms, std::bind(&Vehicle::publish_position, this)
         );
     }
@@ -56,12 +60,24 @@ class Vehicle : public rclcpp::Node
         int indicator_state = this->get_parameter("indicator_state").as_int();
     }
 
-    void set_position(double x, double y, double z)
+    void set_position(geometry_msgs::msg::Point point)
     {
-        m_position.x = x;
-        m_position.y = y;
-        m_position.z = z;
-        RCLCPP_INFO(this->get_logger(), "Aktuelle Position: (%.2f, %.2f, %.2f)", x, y, z);
+        m_position = point;
+    }
+
+    void set_speed(double speed)
+    {
+        m_speed = speed;
+    }
+
+    void set_direction(double direction)
+    {
+        m_direction = direction;
+    }
+
+    void set_vin(int vin)
+    {
+        m_vin = vin;
     }
     
     private:
@@ -69,12 +85,15 @@ class Vehicle : public rclcpp::Node
         {
             // Veröffentlichen der aktuellen Position
             RCLCPP_INFO(this->get_logger(), "Aktuelle Position: (%.2f, %.2f, %.2f)", m_position.x, m_position.y, m_position.z);
-            position_pub_->publish(m_position);
+            m_position_pub->publish(m_position);
         }
 
         geometry_msgs::msg::Point m_position;
-        rclcpp::TimerBase::SharedPtr timer_;
-        rclcpp::Publisher<geometry_msgs::msg::Point>::SharedPtr position_pub_;
+        double m_speed;
+        double m_direction;
+        int m_vin;
+        rclcpp::TimerBase::SharedPtr m_timer;
+        rclcpp::Publisher<geometry_msgs::msg::Point>::SharedPtr m_position_pub;
 };
 
 int main(int argc, char * argv[])
