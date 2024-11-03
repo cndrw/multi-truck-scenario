@@ -22,6 +22,8 @@ public:
         // Publisher der die Daten der Instanz veröffentlicht
         m_vehicle_pub = this->create_publisher<mts_msgs::VehicleBaseData>("vehicle_base_data", 10);
 
+        m_solution_pub = this->create_publisher<mts_msgs::S2Solution>("s2_solution", 10);
+
         // Subscriber der die Werte der anderen Fahrzeuge empfängt
         m_vehicle_sub = this->create_subscription<mts_msgs::VehicleBaseData>(
             "vehicle_base_data", 10, std::bind(&Vehicle::vehicle_position_callback, this, std::placeholders::_1)
@@ -95,6 +97,8 @@ private:
 
     void solve_scenario_s2()
     {
+        int winner_vin = -1;
+
         for (const auto& v1 : m_vehicles)
         {
             double angle = v1.second->direction; // 0, 90, 180, 270
@@ -102,19 +106,20 @@ private:
             {
                 if (v1 == v2) continue;
 
-                angle = angle == 270 ? 0 : angle + 90;
+                angle = angle == 270.0 ? 0.0 : angle + 90.0;
                 if (angle == v2.second->direction) continue;
 
                 // no car to the right
                 // send the solution
-                auto solution = mts_msgs::S2Solution();
-
-                solution.author_vin = m_vin;
-                solution.winner_vin = v1.second->vin;
-                
-                m_solution_pub->publish(solution);
+                winner_vin = v1.second->vin;
             }
         }
+                auto solution = mts_msgs::S2Solution();
+                solution.header.stamp = rclcpp::Clock().now();
+                solution.author_vin = m_vin;
+                solution.winner_vin = winner_vin;
+                
+                m_solution_pub->publish(solution);
     }
 
 
@@ -130,6 +135,10 @@ private:
             {
                 m_vehicles.emplace(key, vehicle_data);
                 std::cout << (m_vehicles[key]->vin) << std::endl;
+                if (m_vehicles.size() == 3)
+                {
+                    solve_scenario_s2();
+                }
             }
     }
         // base package informations
