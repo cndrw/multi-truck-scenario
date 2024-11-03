@@ -25,7 +25,7 @@ class Map : public rclcpp::Node
         send_frequenzy, std::bind(&Map::timer_callback, this)
       );
 
-      m_vehicle_sub = this->create_subscription<mts_msgs::VehicleBaseData>("vecicle_base_data", 10,
+      m_vehicle_sub = this->create_subscription<mts_msgs::VehicleBaseData>("vehicle_base_data", 10,
         std::bind(&Map::vehicle_position_callback, this, std::placeholders::_1)
       );
     }

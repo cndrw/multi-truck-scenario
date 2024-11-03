@@ -19,7 +19,7 @@ class Vehicle : public rclcpp::Node
     {
         
         handle_parameters();
-        m_vehicle_pub = this->create_publisher<mts_msgs::VehicleBaseData>("vehicle_position", 10);
+        m_vehicle_pub = this->create_publisher<mts_msgs::VehicleBaseData>("vehicle_base_data", 10);
 
         // Timer, der die Position alle 100 ms veröffentlicht
         m_timer = this->create_wall_timer(
