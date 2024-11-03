@@ -5,10 +5,12 @@
 
 #include "rclcpp/rclcpp.hpp"
 #include "nav_msgs/msg/occupancy_grid.hpp"
+#include "multi_truck_scenario/msg/vehicle_base_data.hpp"
 
 using namespace std::chrono_literals;
+namespace mts_msgs = multi_truck_scenario::msg;
 
-enum Indicator{off, left, right, warning};
+enum Indicator { off, left, right, warning };
 
 class Vehicle : public rclcpp::Node
 {
@@ -17,19 +19,11 @@ class Vehicle : public rclcpp::Node
     {
         
         handle_parameters();
-        m_position_pub = this->create_publisher<geometry_msgs::msg::Point>("vehicle_position", 10);
-
-        // Initialisiere Position
-        m_position.x = 0.0;
-        m_position.y = 0.0;
-        m_position.z = 0.0;
-        m_speed = 0.0; //Speed in m/s
-        m_direction = 0.0; //Richtung in Grad
-        m_vin = 0;
+        m_vehicle_pub = this->create_publisher<mts_msgs::VehicleBaseData>("vehicle_position", 10);
 
         // Timer, der die Position alle 100 ms veröffentlicht
         m_timer = this->create_wall_timer(
-            100ms, std::bind(&Vehicle::publish_position, this)
+            100ms, std::bind(&Vehicle::publish_vehicle, this)
         );
     }
 
@@ -38,31 +32,26 @@ class Vehicle : public rclcpp::Node
         this->declare_parameter("position_x", 0.0);
         this->declare_parameter("position_y", 0.0);
         this->declare_parameter("position_z", 0.0);
-        this->declare_parameter("direction_x", 0.0);
-        this->declare_parameter("direction_y", 0.0);
-        this->declare_parameter("direction_z", 0.0);
+        this->declare_parameter("direction", 0.0);
         this->declare_parameter("vin", 0);
         this->declare_parameter("speed", 0.0);
         this->declare_parameter("indicator_state", 0);
+        
+        m_position.point.x = this->get_parameter("position_x").as_double();
+        m_position.point.y = this->get_parameter("position_y").as_double();
+        m_position.point.z = this->get_parameter("position_z").as_double();
 
-        auto pos_point = geometry_msgs::msg::Point();
-        pos_point.x = this->get_parameter("position_x").as_double();
-        pos_point.x = this->get_parameter("position_y").as_double();
-        pos_point.x = this->get_parameter("position_z").as_double();
+        m_direction = this->get_parameter("direction").as_double();
 
-        auto dir_point = geometry_msgs::msg::Point();
-        dir_point.x = this->get_parameter("direction_x").as_double();
-        dir_point.x = this->get_parameter("direction_y").as_double();
-        dir_point.x = this->get_parameter("direction_z").as_double();
-
-        int vin = this->get_parameter("vin").as_int();
-        double speed = this->get_parameter("speed").as_double();
-        int indicator_state = this->get_parameter("indicator_state").as_int();
+        m_vin = this->get_parameter("vin").as_int();
+        m_speed = this->get_parameter("speed").as_double();
+        m_indicator_state = (Indicator)this->get_parameter("indicator_state").as_int();
     }
 
-    void set_position(geometry_msgs::msg::Point point)
+    void set_position(geometry_msgs::msg::PointStamped point)
     {
         m_position = point;
+        m_position.header.stamp = rclcpp::Clock().now();
     }
 
     void set_speed(double speed)
@@ -81,19 +70,32 @@ class Vehicle : public rclcpp::Node
     }
     
     private:
-        void publish_position()
+        void publish_vehicle()
         {
             // Veröffentlichen der aktuellen Position
-            RCLCPP_INFO(this->get_logger(), "Aktuelle Position: (%.2f, %.2f, %.2f)", m_position.x, m_position.y, m_position.z);
-            m_position_pub->publish(m_position);
+            // RCLCPP_INFO(this->get_logger(), "Aktuelle Position: (%.2f, %.2f, %.2f)", m_position.x, m_position.y, m_position.z);
+            m_position.header.stamp = rclcpp::Clock().now();
+
+            // build the base data package 
+            auto vehicle_base_data = mts_msgs::VehicleBaseData();
+            vehicle_base_data.position = m_position;
+            vehicle_base_data.direction = m_direction;
+            vehicle_base_data.speed = m_speed;
+            vehicle_base_data.vin = m_vin;
+            vehicle_base_data.indicator_state = m_indicator_state;
+
+            m_vehicle_pub->publish(vehicle_base_data);
         }
 
-        geometry_msgs::msg::Point m_position;
+        // base package informations
         double m_speed;
         double m_direction;
         int m_vin;
+        geometry_msgs::msg::PointStamped m_position;
+        Indicator m_indicator_state = Indicator::off;
+
         rclcpp::TimerBase::SharedPtr m_timer;
-        rclcpp::Publisher<geometry_msgs::msg::Point>::SharedPtr m_position_pub;
+        rclcpp::Publisher<mts_msgs::VehicleBaseData>::SharedPtr m_vehicle_pub;
 };
 
 int main(int argc, char * argv[])
