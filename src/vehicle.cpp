@@ -102,24 +102,33 @@ private:
         for (const auto& v1 : m_vehicles)
         {
             double angle = v1.second->direction; // 0, 90, 180, 270
+            int count = 0;
+
             for (const auto& v2 : m_vehicles)
             {
                 if (v1 == v2) continue;
 
-                angle = angle == 270.0 ? 0.0 : angle + 90.0;
-                if (angle == v2.second->direction) continue;
+                double wanted_angle = angle == 270.0 ? 0.0 : angle + 90.0;
 
-                // no car to the right
-                // send the solution
+                // is there a car to the right? Then v1 can't be the winner 
+                if (wanted_angle == v2.second->direction) break;
+
+                count++;
+            }
+
+            // if all cars are not "right" than this one has to drive
+            if (static_cast<size_t>(count) == m_vehicles.size() - 1)
+            {
                 winner_vin = v1.second->vin;
             }
         }
-                auto solution = mts_msgs::S2Solution();
-                solution.header.stamp = rclcpp::Clock().now();
-                solution.author_vin = m_vin;
-                solution.winner_vin = winner_vin;
-                
-                m_solution_pub->publish(solution);
+
+        auto solution = mts_msgs::S2Solution();
+        solution.header.stamp = rclcpp::Clock().now();
+        solution.author_vin = m_vin;
+        solution.winner_vin = winner_vin;
+        
+        m_solution_pub->publish(solution);
     }
 
 
