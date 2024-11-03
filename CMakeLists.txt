@@ -23,9 +23,13 @@ find_package(rclcpp REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(nav_msgs REQUIRED)
 
-# Nachrichtengenerierung
-rosidl_generate_interfaces(${PROJECT_NAME}
+set(msg_files
   "msg/VehicleBaseData.msg"
+  "msg/S2Solution.msg"
+)
+
+rosidl_generate_interfaces(${PROJECT_NAME}
+  ${msg_files}
   DEPENDENCIES geometry_msgs
 )
 
