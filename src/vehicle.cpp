@@ -17,9 +17,14 @@ class Vehicle : public rclcpp::Node
   public:
     Vehicle() : rclcpp::Node("vehicle")
     {
-        
         handle_parameters();
+        // Publisher der die Daten der Instanz veröffentlicht
         m_vehicle_pub = this->create_publisher<mts_msgs::VehicleBaseData>("vehicle_base_data", 10);
+
+        // Subscriber der die Werte der anderen Fahrzeuge empfängt
+        m_vehicle_sub = this->create_subscription<mts_msgs::VehicleBaseData>(
+            "vehicle_base_data", 10, std::bind(&Vehicle::vehicle_position_callback, this, std::placeholders::_1)
+        );
 
         // Timer, der die Position alle 100 ms veröffentlicht
         m_timer = this->create_wall_timer(
@@ -87,6 +92,20 @@ class Vehicle : public rclcpp::Node
             m_vehicle_pub->publish(vehicle_base_data);
         }
 
+        void vehicle_position_callback(const mts_msgs::VehicleBaseData::SharedPtr vehicle_data)
+        {
+            /* this method shall do:
+                - read position & direction & indicator state & vin of up to 2 other vehicles
+            */
+            // Handle the received message
+            // RCLCPP_INFO(this->get_logger(), "Vehicle Info: \n\t VIN: %d \n\t Position: \n\t\t X: %.2f \n\t\t Y: %.2f \n\t\t Z: %.2f \n\t Direction: %.2f \n\t Speed: %.2f \n\t Indicator State: %d", msg->vin, msg->position.point.x, msg->position.point.y, msg->position.point.z, msg->direction, msg->speed, msg->indicator_state);
+            const auto key = vehicle_data->vin;
+            if (m_vehicles.count(key) == 0) 
+            {
+                m_vehicles.emplace(key, vehicle_data);
+                std::cout << (m_vehicles[key]->vin) << std::endl;
+            }
+        }
         // base package informations
         double m_speed;
         double m_direction;
@@ -96,6 +115,8 @@ class Vehicle : public rclcpp::Node
 
         rclcpp::TimerBase::SharedPtr m_timer;
         rclcpp::Publisher<mts_msgs::VehicleBaseData>::SharedPtr m_vehicle_pub;
+        rclcpp::Subscription<mts_msgs::VehicleBaseData>::SharedPtr m_vehicle_sub;
+        std::unordered_map<int, mts_msgs::VehicleBaseData::SharedPtr> m_vehicles;
 };
 
 int main(int argc, char * argv[])
