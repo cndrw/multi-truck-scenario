@@ -6,6 +6,7 @@
 #include "rclcpp/rclcpp.hpp"
 #include "nav_msgs/msg/occupancy_grid.hpp"
 #include "multi_truck_scenario/msg/vehicle_base_data.hpp"
+#include "multi_truck_scenario/msg/s2_solution.hpp"
 
 using namespace std::chrono_literals;
 namespace mts_msgs = multi_truck_scenario::msg;
@@ -14,7 +15,7 @@ enum Indicator { off, left, right, warning };
 
 class Vehicle : public rclcpp::Node
 {
-  public:
+public:
     Vehicle() : rclcpp::Node("vehicle")
     {
         handle_parameters();
@@ -74,26 +75,51 @@ class Vehicle : public rclcpp::Node
         m_vin = vin;
     }
     
-    private:
-        void publish_vehicle()
+private:
+    void publish_vehicle()
+    {
+        // Veröffentlichen der aktuellen Position
+        // RCLCPP_INFO(this->get_logger(), "Aktuelle Position: (%.2f, %.2f, %.2f)", m_position.x, m_position.y, m_position.z);
+        m_position.header.stamp = rclcpp::Clock().now();
+
+        // build the base data package 
+        auto vehicle_base_data = mts_msgs::VehicleBaseData();
+        vehicle_base_data.position = m_position;
+        vehicle_base_data.direction = m_direction;
+        vehicle_base_data.speed = m_speed;
+        vehicle_base_data.vin = m_vin;
+        vehicle_base_data.indicator_state = m_indicator_state;
+
+        m_vehicle_pub->publish(vehicle_base_data);
+    }
+
+    void solve_scenario_s2()
+    {
+        for (const auto& v1 : m_vehicles)
         {
-            // Veröffentlichen der aktuellen Position
-            // RCLCPP_INFO(this->get_logger(), "Aktuelle Position: (%.2f, %.2f, %.2f)", m_position.x, m_position.y, m_position.z);
-            m_position.header.stamp = rclcpp::Clock().now();
+            double angle = v1.second->direction; // 0, 90, 180, 270
+            for (const auto& v2 : m_vehicles)
+            {
+                if (v1 == v2) continue;
 
-            // build the base data package 
-            auto vehicle_base_data = mts_msgs::VehicleBaseData();
-            vehicle_base_data.position = m_position;
-            vehicle_base_data.direction = m_direction;
-            vehicle_base_data.speed = m_speed;
-            vehicle_base_data.vin = m_vin;
-            vehicle_base_data.indicator_state = m_indicator_state;
+                angle = angle == 270 ? 0 : angle + 90;
+                if (angle == v2.second->direction) continue;
 
-            m_vehicle_pub->publish(vehicle_base_data);
+                // no car to the right
+                // send the solution
+                auto solution = mts_msgs::S2Solution();
+
+                solution.author_vin = m_vin;
+                solution.winner_vin = v1.second->vin;
+                
+                m_solution_pub->publish(solution);
+            }
         }
+    }
 
-        void vehicle_position_callback(const mts_msgs::VehicleBaseData::SharedPtr vehicle_data)
-        {
+
+    void vehicle_position_callback(const mts_msgs::VehicleBaseData::SharedPtr vehicle_data)
+    {
             /* this method shall do:
                 - read position & direction & indicator state & vin of up to 2 other vehicles
             */
@@ -105,7 +131,7 @@ class Vehicle : public rclcpp::Node
                 m_vehicles.emplace(key, vehicle_data);
                 std::cout << (m_vehicles[key]->vin) << std::endl;
             }
-        }
+    }
         // base package informations
         double m_speed;
         double m_direction;
@@ -117,6 +143,7 @@ class Vehicle : public rclcpp::Node
         rclcpp::Publisher<mts_msgs::VehicleBaseData>::SharedPtr m_vehicle_pub;
         rclcpp::Subscription<mts_msgs::VehicleBaseData>::SharedPtr m_vehicle_sub;
         std::unordered_map<int, mts_msgs::VehicleBaseData::SharedPtr> m_vehicles;
+        rclcpp::Publisher<mts_msgs::S2Solution>::SharedPtr m_solution_pub;
 };
 
 int main(int argc, char * argv[])
