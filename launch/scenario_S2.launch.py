@@ -18,10 +18,10 @@ config_file_path = os.path.join(workspace_dir, 'src', 'multi-truck-scenario', 'c
 def generate_launch_description():
     
     vehicles = [
-        {'name': 'vehicle_1', 'vin': 0, 'speed': 0, 'indicator': 0, 'position_x': 0, 'position_y': 0, 'position_z': 0, 'direction_angle': 0},
-        {'name': 'vehicle_2', 'vin': 1, 'speed': 0, 'indicator': 0, 'position_x': 1, 'position_y': 0, 'position_z': 0, 'direction_angle': 0},
-        {'name': 'vehicle_3', 'vin': 2, 'speed': 0, 'indicator': 0, 'position_x': 2, 'position_y': 1, 'position_z': 0, 'direction_angle': 0},
-        {'name': 'vehicle_4', 'vin': 3, 'speed': 0, 'indicator': 0, 'position_x': 3, 'position_y': 1, 'position_z': 0, 'direction_angle': 0},
+        {'name': 'vehicle_1', 'vin': 1, 'speed': 0.0, 'indicator': 0, 'position_x': 2.0, 'position_y': 0.0, 'position_z': 0.0, 'direction_angle': 90.0},
+        {'name': 'vehicle_2', 'vin': 2, 'speed': 0.0, 'indicator': 0, 'position_x': 3.0, 'position_y': 2.0, 'position_z': 0.0, 'direction_angle': 90.0},
+        {'name': 'vehicle_3', 'vin': 3, 'speed': 0.0, 'indicator': 0, 'position_x': 1.0, 'position_y': 3.0, 'position_z': 0.0, 'direction_angle': 90.0}
+        # {'name': 'vehicle_4', 'vin': 3, 'speed': 0, 'indicator': 0, 'position_x': 3, 'position_y': 1, 'position_z': 0, 'direction_angle': 0},
         # Add more vehicles as needed
     ]
 
@@ -29,7 +29,7 @@ def generate_launch_description():
     for vehicle in vehicles:
         vehicle_nodes.append(
             Node(
-                package='multi-truck-scenario',
+                package='multi_truck_scenario',
                 executable='vehicle_node',
                 name=vehicle['name'],
                 parameters=[{
@@ -39,14 +39,14 @@ def generate_launch_description():
                     'position_x': vehicle['position_x'],
                     'position_y': vehicle['position_y'],
                     'position_z': vehicle['position_z'],
-                    'direction': vehicle['direction_angle'],
+                    'direction': vehicle['direction_angle']
                 }]
             )
         )
 
     return LaunchDescription(vehicle_nodes + [
         Node(
-            package='multi-truck-scenario',
+            package='multi_truck_scenario',
             executable='map_node',
             name='map_simulation',
         ),
@@ -57,6 +57,5 @@ def generate_launch_description():
             name='rviz2',
             output='screen',
             arguments = ['-d', config_file_path],  # Optional: specify a config file
-        ),
-
+        )
     ])
