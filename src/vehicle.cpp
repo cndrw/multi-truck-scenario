@@ -12,7 +12,7 @@ using namespace std::chrono_literals;
 namespace mts_msgs = multi_truck_scenario::msg;
 
 enum Indicator { off, left, right, warning };
-enum Engine { on, off };
+enum Engine { engine_on, engine_off };
 
 class Vehicle : public rclcpp::Node
 {
@@ -160,7 +160,7 @@ private:
         int m_vin;
         geometry_msgs::msg::PointStamped m_position;
         Indicator m_indicator_state = Indicator::off;
-        Engine m_engine_state = Engine::on;
+        Engine m_engine_state = Engine::engine_on;
 
         rclcpp::TimerBase::SharedPtr m_timer;
         rclcpp::Publisher<mts_msgs::VehicleBaseData>::SharedPtr m_vehicle_pub;
