@@ -12,6 +12,7 @@ using namespace std::chrono_literals;
 namespace mts_msgs = multi_truck_scenario::msg;
 
 enum Indicator { off, left, right, warning };
+enum Engine { on, off };
 
 class Vehicle : public rclcpp::Node
 {
@@ -44,6 +45,7 @@ public:
         this->declare_parameter("vin", 0);
         this->declare_parameter("speed", 0.0);
         this->declare_parameter("indicator_state", 0);
+        this->declare_parameter("engine_state", 0);
         
         m_position.point.x = this->get_parameter("position_x").as_double();
         m_position.point.y = this->get_parameter("position_y").as_double();
@@ -54,6 +56,7 @@ public:
         m_vin = this->get_parameter("vin").as_int();
         m_speed = this->get_parameter("speed").as_double();
         m_indicator_state = (Indicator)this->get_parameter("indicator_state").as_int();
+        m_engine_state = (Engine)this->get_parameter("engine_state").as_int();
     }
 
     void set_position(geometry_msgs::msg::PointStamped point)
@@ -86,6 +89,7 @@ private:
 
         // build the base data package 
         auto vehicle_base_data = mts_msgs::VehicleBaseData();
+        vehicle_base_data.engine_state = m_engine_state;
         vehicle_base_data.position = m_position;
         vehicle_base_data.direction = m_direction;
         vehicle_base_data.speed = m_speed;
@@ -156,6 +160,7 @@ private:
         int m_vin;
         geometry_msgs::msg::PointStamped m_position;
         Indicator m_indicator_state = Indicator::off;
+        Engine m_engine_state = Engine::on;
 
         rclcpp::TimerBase::SharedPtr m_timer;
         rclcpp::Publisher<mts_msgs::VehicleBaseData>::SharedPtr m_vehicle_pub;
