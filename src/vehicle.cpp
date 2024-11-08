@@ -102,7 +102,7 @@ private:
 
     void solve_scenario_s2()
     {
-        vehicle_filter();
+        vehicle_standard_filter();
 
         int winner_vin = -1;
 
@@ -158,47 +158,38 @@ private:
             }
     }
 
-    void vehicle_filter()
+    void vehicle_standard_filter()
     {
-        for (auto it = m_vehicles.begin(); it != m_vehicles.end(); )
+       // Temporäre Map, um die gefilterten Fahrzeuge zu speichern
+      std::unordered_map<int, mts_msgs::VehicleBaseData::SharedPtr> filtered_vehicles;
+
+      for (const auto& vehicle_filtered_data : m_vehicles)
+      {
+        // Überprüfung, ob das Fahrzeug aktiv ist
+        if (vehicle_filtered_data.second->engine_state != Engine::engine_on)
         {
-            if(it->second->engine_state != Engine::engine_on)
-            {
-                it = m_vehicles.erase(it);
-                continue;
-            }
-
-            // Berechnung der euklidischen Distanz
-            double dx = it->second->position.point.x - m_position.point.x;
-            double dy = it->second->position.point.y - m_position.point.y;
-            double distance = std::sqrt(dx * dx + dy * dy);
-
-            // Berechnung des Winkels zum eigenen Fahrzeug (in Grad)
-            double angle_to_vehicle = std::atan2(dy, dx) * 180.0 / M_PI;
-            if (angle_to_vehicle < 0) angle_to_vehicle += 360.0;  // Winkel normalisieren auf [0, 360]
-
-            // Prüfen, ob das Fahrzeug auf die Kreuzung zufährt
-            double direction_difference = std::fabs(it->second->direction - angle_to_vehicle);
-            if (direction_difference > 180.0) direction_difference = 360.0 - direction_difference;  // Winkelabweichung in den Bereich [0, 180] bringen
-
-            // Fahrzeuge filtern, die wegfahren (z.B. wenn die Richtung mehr als 90° von der Kreuzungsrichtung abweicht)
-            if (direction_difference > 90.0)
-            {
-                it = m_vehicles.erase(it);
-                continue;
-            }
-
-            // Überprüfen, ob die Distanz größer als 1 km ist
-            if (distance > 1000.0)
-            {
-                // Fahrzeug ist weiter als 1 km entfernt, also entfernen wir es aus der Map
-                it = m_vehicles.erase(it);
-            }
-            else
-            {
-                ++it;
-            }
+            continue;  // Fahrzeug überspringen, wenn es nicht aktiv ist
         }
+
+        // Berechnung der euklidischen Distanz zum Fahrzeug
+        double dx = vehicle_filtered_data.second->position.point.x - m_position.point.x;
+        double dy = vehicle_filtered_data.second->position.point.y - m_position.point.y;
+        double distance = std::sqrt(dx * dx + dy * dy);
+
+        // Wenn das Fahrzeug innerhalb von 1 km ist, fügen wir es der gefilterten Map hinzu
+        if (distance <= 1000.0)
+        {
+            filtered_vehicles.emplace(vehicle_filtered_data.first, vehicle_filtered_data.second);
+        }
+      }
+
+      for (const auto& filtered_vehicle : filtered_vehicles)
+      {
+        auto vehicle_base_data = mts_msgs::VehicleBaseData();
+        vehicle_base_data = *(filtered_vehicle.second);  // Fahrzeugdaten werden übernehmen
+
+        m_vehicle_pub->publish(vehicle_base_data);  // Veröffentlichen der gefilterten Fahrzeugdaten
+      }
     }
 
         // base package informations
