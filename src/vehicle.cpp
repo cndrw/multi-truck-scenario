@@ -2,6 +2,7 @@
 #include <functional>
 #include <memory>
 #include <string>
+#include <cmath> // für std::sqrt
 
 #include "rclcpp/rclcpp.hpp"
 #include "nav_msgs/msg/occupancy_grid.hpp"
@@ -101,6 +102,8 @@ private:
 
     void solve_scenario_s2()
     {
+        vehicle_filter();
+
         int winner_vin = -1;
 
         for (const auto& v1 : m_vehicles)
@@ -154,6 +157,50 @@ private:
                 }
             }
     }
+
+    void vehicle_filter()
+    {
+        for (auto it = m_vehicles.begin(); it != m_vehicles.end(); )
+        {
+            if(it->second->engine_state != Engine::engine_on)
+            {
+                it = m_vehicles.erase(it);
+                continue;
+            }
+
+            // Berechnung der euklidischen Distanz
+            double dx = it->second->position.point.x - m_position.point.x;
+            double dy = it->second->position.point.y - m_position.point.y;
+            double distance = std::sqrt(dx * dx + dy * dy);
+
+            // Berechnung des Winkels zum eigenen Fahrzeug (in Grad)
+            double angle_to_vehicle = std::atan2(dy, dx) * 180.0 / M_PI;
+            if (angle_to_vehicle < 0) angle_to_vehicle += 360.0;  // Winkel normalisieren auf [0, 360]
+
+            // Prüfen, ob das Fahrzeug auf die Kreuzung zufährt
+            double direction_difference = std::fabs(it->second->direction - angle_to_vehicle);
+            if (direction_difference > 180.0) direction_difference = 360.0 - direction_difference;  // Winkelabweichung in den Bereich [0, 180] bringen
+
+            // Fahrzeuge filtern, die wegfahren (z.B. wenn die Richtung mehr als 90° von der Kreuzungsrichtung abweicht)
+            if (direction_difference > 90.0)
+            {
+                it = m_vehicles.erase(it);
+                continue;
+            }
+
+            // Überprüfen, ob die Distanz größer als 1 km ist
+            if (distance > 1000.0)
+            {
+                // Fahrzeug ist weiter als 1 km entfernt, also entfernen wir es aus der Map
+                it = m_vehicles.erase(it);
+            }
+            else
+            {
+                ++it;
+            }
+        }
+    }
+
         // base package informations
         double m_speed;
         double m_direction;
