@@ -7,6 +7,7 @@
 #include "std_msgs/msg/header.hpp"
 #include "rclcpp/rclcpp.hpp"
 #include "nav_msgs/msg/occupancy_grid.hpp"
+#include "geometry_msgs/msg/point_stamped.hpp"
 #include "multi_truck_scenario/msg/vehicle_base_data.hpp"
 #include "multi_truck_scenario/msg/s2_solution.hpp"
 
@@ -15,6 +16,9 @@ namespace mts_msgs = multi_truck_scenario::msg;
 
 enum class Indicator { off, left, right, warning };
 enum class Engine { on, off };
+
+static constexpr auto RAD2DEG { 180 / M_PI };
+
 
 class Vehicle : public rclcpp::Node
 {
@@ -102,33 +106,50 @@ private:
         m_vehicle_pub->publish(vehicle_base_data);
     }
 
+   geometry_msgs::msg::PointStamped substract(geometry_msgs::msg::PointStamped& p1, geometry_msgs::msg::PointStamped& p2)
+   {
+        auto tmp = geometry_msgs::msg::PointStamped();
+        tmp.point.x = p2.point.x - p1.point.x;
+        tmp.point.y = p2.point.y - p1.point.y;
+        return tmp;
+   }
+
     void solve_scenario_s2()
     {
         int winner_vin = -1;
-
         for (const auto& v1 : m_vehicles)
         {
-            double angle = v1.second->direction; // 0, 90, 180, 270
-            int count = 0;
+            size_t count = 0;
+            // get the adjustment value so that v1.direction - adjustment_value equals 90
+            const auto adjust_angle = 90 - v1.second->direction;
+            const auto adjusted_v1_angle= v1.second->direction + adjust_angle; 
 
             for (const auto& v2 : m_vehicles)
             {
                 if (v1 == v2) continue;
 
-                double wanted_angle = angle == 270.0 ? 0.0 : angle + 90.0;
+                const auto diff = substract(v1.second->position, v2.second->position);
+                
+                auto diff_angle = std::atan2(diff.point.y, diff.point.x) * RAD2DEG;
+                diff_angle += adjust_angle; // also adjust the angle of the differenz vector
 
-                // is there a car to the right? Then v1 can't be the winner 
-                if (wanted_angle == v2.second->direction) break;
+                if (diff_angle < 0)
+                {
+                    diff_angle += 360;
+                }
 
-                count++;
+                if (diff_angle >= adjusted_v1_angle)
+                {
+                    count++;
+                }
             }
 
-            // if all cars are not "right" than this one has to drive
-            if (static_cast<size_t>(count) == m_vehicles.size() - 1)
+             // if all cars are not "right" than this one has to drive
+            if (count == m_vehicles.size() - 1)
             {
                 winner_vin = v1.second->vin;
             }
-        }
+        } 
 
         auto solution = mts_msgs::S2Solution();
         solution.header.stamp = rclcpp::Clock().now();
