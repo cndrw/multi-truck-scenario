@@ -102,8 +102,6 @@ private:
 
     void solve_scenario_s2()
     {
-        vehicle_standard_filter();
-
         int winner_vin = -1;
 
         for (const auto& v1 : m_vehicles)
@@ -141,6 +139,12 @@ private:
 
     void vehicle_position_callback(const mts_msgs::VehicleBaseData::SharedPtr vehicle_data)
     {
+        if (vehicle_standard_filter(vehicle_data) == false)
+        {
+            return;
+        }
+        
+        vehicle_standard_filter(vehicle_data);
             /* this method shall do:
                 - read position & direction & indicator state & vin of up to 2 other vehicles
             */
@@ -158,38 +162,29 @@ private:
             }
     }
 
-    void vehicle_standard_filter()
+    bool vehicle_standard_filter(const mts_msgs::VehicleBaseData::SharedPtr vehicle_data)
     {
-       // Temporäre Map, um die gefilterten Fahrzeuge zu speichern
-      std::unordered_map<int, mts_msgs::VehicleBaseData::SharedPtr> filtered_vehicles;
-
-      for (const auto& vehicle_filtered_data : m_vehicles)
-      {
         // Überprüfung, ob das Fahrzeug aktiv ist
-        if (vehicle_filtered_data.second->engine_state != Engine::engine_on)
+        if (vehicle_data->engine_state == Engine::engine_off)
         {
-            continue;  // Fahrzeug überspringen, wenn es nicht aktiv ist
+            return false;  // Fahrzeug überspringen, wenn es nicht aktiv ist
         }
 
         // Berechnung der euklidischen Distanz zum Fahrzeug
-        double dx = vehicle_filtered_data.second->position.point.x - m_position.point.x;
-        double dy = vehicle_filtered_data.second->position.point.y - m_position.point.y;
+        double dx = vehicle_data->position.point.x - m_position.point.x;
+        double dy = vehicle_data->position.point.y - m_position.point.y;
         double distance = std::sqrt(dx * dx + dy * dy);
 
         // Wenn das Fahrzeug innerhalb von 1 km ist, fügen wir es der gefilterten Map hinzu
         if (distance <= 1000.0)
         {
-            filtered_vehicles.emplace(vehicle_filtered_data.first, vehicle_filtered_data.second);
+            return false;
         }
-      }
 
-      for (const auto& filtered_vehicle : filtered_vehicles)
-      {
-        auto vehicle_base_data = mts_msgs::VehicleBaseData();
-        vehicle_base_data = *(filtered_vehicle.second);  // Fahrzeugdaten werden übernehmen
-
-        m_vehicle_pub->publish(vehicle_base_data);  // Veröffentlichen der gefilterten Fahrzeugdaten
-      }
+        else
+        {
+            return true;
+        }
     }
 
         // base package informations
