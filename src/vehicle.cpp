@@ -143,8 +143,6 @@ private:
         {
             return;
         }
-        
-        vehicle_standard_filter(vehicle_data);
             /* this method shall do:
                 - read position & direction & indicator state & vin of up to 2 other vehicles
             */
@@ -179,11 +177,6 @@ private:
         if (distance <= 1000.0)
         {
             return false;
-        }
-
-        else
-        {
-            return true;
         }
     }
 
