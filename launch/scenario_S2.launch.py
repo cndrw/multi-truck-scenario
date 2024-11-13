@@ -1,23 +1,23 @@
 import launch
 from launch import LaunchDescription
 from launch_ros.actions import Node
-import os
-#from ament_index_python.packages import get_package_share_directory
 import random
 
+## make sure to choose one option of the following, don't forget the map node
 ## --------------------------------------------------------------------------------
-# Get the current working directory (workspace directory)
-workspace_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', '..', '..', '..'))
+## os option - older and less intuitive
+# import os
+# workspace_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+# config_file_path = os.path.join(workspace_dir, 'config', 'config_1.rviz')
 
-# Construct the path to the config file directly from the src directory
-config_file_path = os.path.join(workspace_dir, 'src', 'multi-truck-scenario', 'config', 'config_1.rviz')
-
-## Hard coded should be fixed later, works on my machine
+## --------------------------------------------------------------------------------
+## Pathlib option - more modern and recommended
+from pathlib import Path
+workspace_dir = Path(__file__).resolve().parent.parent
+config_file_path = workspace_dir / 'config' / 'config_1.rviz'
+config_file_path = config_file_path.resolve()
 ## --------------------------------------------------------------------------------
 
-## Tasks: - Direction of the vehicles with rnd generated offset
-##        - Rotate map & Vehicles
-##        - 
 def generate_launch_description():
     
     no_of_vehicles = 3 # set how many offsets are created
@@ -63,6 +63,7 @@ def generate_launch_description():
             executable='rviz2',
             name='rviz2',
             output='screen',
-            arguments = ['-d', config_file_path],  # Optional: specify a config file
+            arguments = ['-d', str(config_file_path)],  # Pathlib option - type casting is needed
+            # arguments = ['-d', config_file_path],  # os option
         )
     ])
