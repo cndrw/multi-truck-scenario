@@ -32,7 +32,7 @@ public:
             "vehicle_base_data", 10, std::bind(&Vehicle::vehicle_position_callback, this, std::placeholders::_1)
         );
 
-        // Timer, der die Position alle 100 ms veröffentlicht
+        // Timer, der die Position alle 500 ms veröffentlicht
         m_timer = this->create_wall_timer(
             500ms, std::bind(&Vehicle::publish_vehicle, this)
         );
@@ -87,7 +87,7 @@ private:
     {
         // Veröffentlichen der aktuellen Position
         // RCLCPP_INFO(this->get_logger(), "Aktuelle Position: (%.2f, %.2f, %.2f)", m_position.x, m_position.y, m_position.z);
-       // m_position.header.stamp = rclcpp::Clock().now();
+        m_position.header.stamp = rclcpp::Clock().now();
 
         // build the base data package 
         auto vehicle_base_data = mts_msgs::VehicleBaseData();
@@ -139,28 +139,37 @@ private:
     }
 
 
-    void vehicle_position_callback(const mts_msgs::VehicleBaseData::SharedPtr vehicle_data)
+   void vehicle_position_callback(const mts_msgs::VehicleBaseData::SharedPtr vehicle_data)
+{
+    auto current_time = rclcpp::Clock().now();
+    
+    auto time_diff = current_time - vehicle_data->header.stamp;
+    
+    // difference over 600 ms -> ignoring the message
+    if (time_diff > 600ms)
     {
-        if (vehicle_standard_filter(vehicle_data) == false)
-        {
-            return;
-        }
-            /* this method shall do:
-                - read position & direction & indicator state & vin of up to 2 other vehicles
-            */
-            // Handle the received message
-            // RCLCPP_INFO(this->get_logger(), "Vehicle Info: \n\t VIN: %d \n\t Position: \n\t\t X: %.2f \n\t\t Y: %.2f \n\t\t Z: %.2f \n\t Direction: %.2f \n\t Speed: %.2f \n\t Indicator State: %d", msg->vin, msg->position.point.x, msg->position.point.y, msg->position.point.z, msg->direction, msg->speed, msg->indicator_state);
-            const auto key = vehicle_data->vin;
-            if (m_vehicles.count(key) == 0) 
-            {
-                m_vehicles.emplace(key, vehicle_data);
-                std::cout << (m_vehicles[key]->vin) << std::endl;
-                if (m_vehicles.size() == 3)
-                {
-                    solve_scenario_s2();
-                }
-            }
+        RCLCPP_INFO(this->get_logger(), "Message too old, ignoring it.");
+        return;  // ignoring
     }
+
+    // filter to consider only active vehicles
+    if (vehicle_standard_filter(vehicle_data) == false)
+    {
+        return;
+    }
+
+    // Handle the received message
+    const auto key = vehicle_data->vin;
+    if (m_vehicles.count(key) == 0) 
+    {
+        m_vehicles.emplace(key, vehicle_data);
+        std::cout << (m_vehicles[key]->vin) << std::endl;
+        if (m_vehicles.size() == 3)
+        {
+            solve_scenario_s2();
+        }
+    }
+}
 
     bool vehicle_standard_filter(const mts_msgs::VehicleBaseData::SharedPtr vehicle_data)
     {
