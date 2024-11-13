@@ -2,6 +2,7 @@
 #include <functional>
 #include <memory>
 #include <string>
+#include <random>
 #include <cmath> // für std::sqrt
 
 #include "std_msgs/msg/header.hpp"
@@ -126,6 +127,28 @@ private:
         return tmp;
    }
 
+    void pick_random_vehicle()
+    {
+        bool is_smallest_vin = std::all_of(m_vehicles.begin(), m_vehicles.end(), [this](const auto v) {
+           return m_vin <= v.second->vin;  
+        });
+
+        if (is_smallest_vin)
+        {
+            std::srand(std::time(0)); 
+            int rnd_vin = (std::rand() % 4) + 1; 
+
+
+            
+            auto solution = mts_msgs::S2Solution();
+            solution.header.stamp = rclcpp::Clock().now();
+            solution.author_vin = m_vin;
+            solution.winner_vin = rnd_vin;
+            
+            m_solution_pub->publish(solution);
+        }
+    }
+
     void solve_scenario_s2()
     {
         int winner_vin = -1;
@@ -190,7 +213,14 @@ private:
                 std::cout << (m_vehicles[key]->vin) << std::endl;
                 if (m_vehicles.size() == m_count)
                 {
-                    solve_scenario_s2();
+                    if (m_count == 4)
+                    {
+                        pick_random_vehicle();
+                    }
+                    else
+                    {
+                        solve_scenario_s2();
+                    }
                 }
             }
     }
@@ -203,6 +233,21 @@ private:
         }
 
         m_solution_vins.push_back(solution->winner_vin);
+
+        if (m_vehicles.size() == 4)
+        {
+            m_vehicles.clear();
+            m_solution_vins.clear();
+            m_count--;
+
+            if (solution->winner_vin == m_vin)
+            {
+                RCLCPP_INFO(this->get_logger(), "kill %d", m_vin);
+                m_is_active = false;
+            }
+           return; 
+        }
+
         if (m_solution_vins.size() < m_vehicles.size())
         {
             return;
@@ -300,7 +345,7 @@ private:
         std::vector<int> m_solution_vins;
 
         // temp
-        size_t m_count = 3;
+        size_t m_count = 4;
 };
 
 int main(int argc, char * argv[])
