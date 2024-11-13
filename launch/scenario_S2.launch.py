@@ -17,6 +17,13 @@ workspace_dir = Path(__file__).resolve().parent.parent
 config_file_path = workspace_dir / 'config' / 'config_1.rviz'
 config_file_path = config_file_path.resolve()
 ## --------------------------------------------------------------------------------
+# import the image2grid script and execute it for the map node
+from script.image2grid_converter import generate_cpp_grid_from_image
+# specify path of image using Pathlib
+scenario_S2_map_path = workspace_dir / 'script' / 'painting_10x10_6_colors.png'
+# convert image to grid data - see below for the implementation of the parameters
+grid_values = generate_cpp_grid_from_image(scenario_S2_map_path)
+## --------------------------------------------------------------------------------
 
 def generate_launch_description():
     
@@ -58,6 +65,13 @@ def generate_launch_description():
             package='multi_truck_scenario',
             executable='map_node',
             name='map_simulation',
+            ## add parameter for grid data
+            ## parameters not yet implemented in map.cpp
+            # parameters=[{
+            #     'height': grid_values['height'],
+            #     'width': grid_values['width'],
+            #     'grid_data': grid_values['cpp_grid_data'],
+            # }],
         ),
         # launch rviz2 for 
         Node(

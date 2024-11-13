@@ -79,4 +79,13 @@ print("Width =", converter.width)
 - This script + image files must be transferred to share directory
 - Paint scenario_S2 and implemet it in the launchfile
 '''
-
+## Further developement for integrating in Launchfile:
+def generate_cpp_grid_from_image(image_path):
+    converter = ImageToCppGridConverter(image_path)
+    cpp_grid_data = converter.convert_to_cpp_grid_data()
+    width, height = converter.get_dimensions()
+    return {
+        'cpp_grid_data': cpp_grid_data,
+        'width': width,
+        'height': height
+    }
