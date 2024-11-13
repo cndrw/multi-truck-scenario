@@ -12,8 +12,8 @@
 using namespace std::chrono_literals;
 namespace mts_msgs = multi_truck_scenario::msg;
 
-enum Indicator { off, left, right, warning };
-enum Engine { engine_on, engine_off };
+enum class Indicator { off, left, right, warning };
+enum class Engine { on, off };
 
 class Vehicle : public rclcpp::Node
 {
@@ -90,12 +90,12 @@ private:
 
         // build the base data package 
         auto vehicle_base_data = mts_msgs::VehicleBaseData();
-        vehicle_base_data.engine_state = m_engine_state;
+        vehicle_base_data.engine_state = static_cast<int>(m_engine_state);
         vehicle_base_data.position = m_position;
         vehicle_base_data.direction = m_direction;
         vehicle_base_data.speed = m_speed;
         vehicle_base_data.vin = m_vin;
-        vehicle_base_data.indicator_state = m_indicator_state;
+        vehicle_base_data.indicator_state = static_cast<int>(m_indicator_state);
 
         m_vehicle_pub->publish(vehicle_base_data);
     }
@@ -163,7 +163,7 @@ private:
     bool vehicle_standard_filter(const mts_msgs::VehicleBaseData::SharedPtr vehicle_data)
     {
         // Überprüfung, ob das Fahrzeug aktiv ist
-        if (vehicle_data->engine_state == Engine::engine_off)
+        if (vehicle_data->engine_state == static_cast<signed char>(Engine::off))
         {
             return false;  // Fahrzeug überspringen, wenn es nicht aktiv ist
         }
@@ -186,7 +186,7 @@ private:
         int m_vin;
         geometry_msgs::msg::PointStamped m_position;
         Indicator m_indicator_state = Indicator::off;
-        Engine m_engine_state = Engine::engine_on;
+        Engine m_engine_state = Engine::on;
 
         rclcpp::TimerBase::SharedPtr m_timer;
         rclcpp::Publisher<mts_msgs::VehicleBaseData>::SharedPtr m_vehicle_pub;
