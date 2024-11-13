@@ -4,6 +4,7 @@
 #include <string>
 #include <cmath> // für std::sqrt
 
+#include "std_msgs/msg/header.hpp"
 #include "rclcpp/rclcpp.hpp"
 #include "nav_msgs/msg/occupancy_grid.hpp"
 #include "multi_truck_scenario/msg/vehicle_base_data.hpp"
@@ -33,7 +34,7 @@ public:
 
         // Timer, der die Position alle 100 ms veröffentlicht
         m_timer = this->create_wall_timer(
-            100ms, std::bind(&Vehicle::publish_vehicle, this)
+            500ms, std::bind(&Vehicle::publish_vehicle, this)
         );
     }
 
@@ -86,10 +87,11 @@ private:
     {
         // Veröffentlichen der aktuellen Position
         // RCLCPP_INFO(this->get_logger(), "Aktuelle Position: (%.2f, %.2f, %.2f)", m_position.x, m_position.y, m_position.z);
-        m_position.header.stamp = rclcpp::Clock().now();
+       // m_position.header.stamp = rclcpp::Clock().now();
 
         // build the base data package 
         auto vehicle_base_data = mts_msgs::VehicleBaseData();
+        vehicle_base_data.header.stamp = rclcpp::Clock().now();
         vehicle_base_data.engine_state = static_cast<int>(m_engine_state);
         vehicle_base_data.position = m_position;
         vehicle_base_data.direction = m_direction;
