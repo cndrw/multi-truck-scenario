@@ -74,38 +74,13 @@ class Map : public rclcpp::Node
       grid.info.origin.orientation.z = 0;
       grid.info.origin.orientation.w = 1;
 
-
       add_to_map(m_static_map);
       grid.data = m_grid;
-
-      // update vehicle position on the grid 
-      /*
-      for (const auto& vehicle : m_vehicles)
-      {
-        const int x = vehicle.second->position.point.x;
-        const int y = vehicle.second->position.point.y;
-        grid.data[x + y * m_width] = m_color_map[vehicle.first];
-      }
-      */
 
       m_grid_pub->publish(grid);
 
       clear_map();
     }
-
-    /*
-    void vehicle_position_callback(const mts_msgs::VehicleBaseData::SharedPtr vehicle_data)
-    {
-      const auto key = vehicle_data->vin;
-      if (m_vehicles.count(key) == 0) 
-      {
-        m_vehicles.emplace(key, vehicle_data);
-      }
-      else 
-      {
-        m_vehicles[key] = vehicle_data;
-      }
-    }*/
 
     void vehicle_position_callback(const mts_msgs::VehicleBaseData::SharedPtr vehicle_data)
     {
@@ -120,17 +95,21 @@ class Map : public rclcpp::Node
         m_vehicles[key] = vehicle_data;
       }
 
-      const auto& pos = vehicle_data->position.point;
-      RCLCPP_INFO(this->get_logger(), "colr: %d of %d", m_color_map[key], key);
-      m_grid[pos.x + pos.y * m_width] = m_color_map[key];
+      set_vehicle_color(key);
     }
 
     void s2_solution_callback(const mts_msgs::S2Solution::SharedPtr solution)
     {
         const auto vin = solution->winner_vin;
-        RCLCPP_INFO(this->get_logger(), "winner vin: %d", solution->winner_vin);
+
+        // set the winner green
         m_color_map[vin] = Colors::Green;
 
+        set_vehicle_color(vin);
+    }
+
+    void set_vehicle_color(const int vin)
+    {
         const auto& pos = m_vehicles[vin]->position.point;
         m_grid[pos.x + pos.y * m_width] = m_color_map[vin];
     }
@@ -155,7 +134,7 @@ class Map : public rclcpp::Node
     int m_width;
     int m_height;
     int m_resolution;
-    std::chrono::milliseconds send_frequenzy = 1000ms;
+    std::chrono::milliseconds send_frequenzy = 250ms;
     rclcpp::TimerBase::SharedPtr m_timer;
     std::unordered_map<int, mts_msgs::VehicleBaseData::SharedPtr> m_vehicles;
     std::vector<int8_t> m_static_map;
