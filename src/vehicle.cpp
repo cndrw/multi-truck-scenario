@@ -34,11 +34,17 @@ public:
             "vehicle_base_data", 10, std::bind(&Vehicle::vehicle_position_callback, this, std::placeholders::_1)
         );
 
+        m_solution_sub = this->create_subscription<mts_msgs::S2Solution>(
+            "s2_solution", 10, std::bind(&Vehicle::s2_solution_callback, this, std::placeholders::_1)
+        );
+
         // Timer, der die Position alle 100 ms veröffentlicht
         m_timer = this->create_wall_timer(
-            100ms, std::bind(&Vehicle::publish_vehicle, this)
+            500ms, std::bind(&Vehicle::publish_vehicle, this)
         );
     }
+
+    ~Vehicle() {}
 
     void handle_parameters()
     {
@@ -87,6 +93,11 @@ public:
 private:
     void publish_vehicle()
     {
+        if (!m_is_active)
+        {
+            return;
+        }
+
         // Veröffentlichen der aktuellen Position
         // RCLCPP_INFO(this->get_logger(), "Aktuelle Position: (%.2f, %.2f, %.2f)", m_position.x, m_position.y, m_position.z);
         m_position.header.stamp = rclcpp::Clock().now();
@@ -159,6 +170,10 @@ private:
 
     void vehicle_position_callback(const mts_msgs::VehicleBaseData::SharedPtr vehicle_data)
     {
+        if(!m_is_active)
+        {
+            return;
+        }
             /* this method shall do:
                 - read position & direction & indicator state & vin of up to 2 other vehicles
             */
@@ -175,6 +190,33 @@ private:
                 }
             }
     }
+
+    void s2_solution_callback(const mts_msgs::S2Solution::SharedPtr solution)
+    {
+        if(!m_is_active)
+        {
+            return;
+        }
+
+        m_solution_vins.push_back(solution->winner_vin);
+        if (m_solution_vins.size() < m_vehicles.size())
+        {
+            return;
+        }
+
+        for (const auto vin : m_solution_vins)
+        {
+            if (vin != m_vin)
+            {
+                return;
+            }
+        }
+        RCLCPP_INFO(this->get_logger(), "kill %d", m_vin);
+        m_is_active = false;
+    }
+
+
+        bool m_is_active = true;
         // base package informations
         double m_speed;
         double m_direction;
@@ -184,10 +226,14 @@ private:
         Engine m_engine_state = Engine::engine_on;
 
         rclcpp::TimerBase::SharedPtr m_timer;
+        std::unordered_map<int, mts_msgs::VehicleBaseData::SharedPtr> m_vehicles;
+
         rclcpp::Publisher<mts_msgs::VehicleBaseData>::SharedPtr m_vehicle_pub;
         rclcpp::Subscription<mts_msgs::VehicleBaseData>::SharedPtr m_vehicle_sub;
-        std::unordered_map<int, mts_msgs::VehicleBaseData::SharedPtr> m_vehicles;
+
         rclcpp::Publisher<mts_msgs::S2Solution>::SharedPtr m_solution_pub;
+        rclcpp::Subscription<mts_msgs::S2Solution>::SharedPtr m_solution_sub;
+        std::vector<int> m_solution_vins;
 };
 
 int main(int argc, char * argv[])
