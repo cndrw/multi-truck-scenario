@@ -184,7 +184,7 @@ private:
             {
                 m_vehicles.emplace(key, vehicle_data);
                 std::cout << (m_vehicles[key]->vin) << std::endl;
-                if (m_vehicles.size() == 3)
+                if (m_vehicles.size() == m_count)
                 {
                     solve_scenario_s2();
                 }
@@ -204,15 +204,23 @@ private:
             return;
         }
 
-        for (const auto vin : m_solution_vins)
+        // check if all vins are the same
+        bool all_equal = std::all_of(m_solution_vins.begin(), m_solution_vins.end(), [this](int vin) {
+            return vin == this->m_solution_vins[0];
+        });
+
+        if (all_equal)
         {
-            if (vin != m_vin)
+            m_vehicles.clear();
+            m_solution_vins.clear();
+            m_count--;
+
+            if (solution->winner_vin == m_vin)
             {
-                return;
+                RCLCPP_INFO(this->get_logger(), "kill %d", m_vin);
+                m_is_active = false;
             }
         }
-        RCLCPP_INFO(this->get_logger(), "kill %d", m_vin);
-        m_is_active = false;
     }
 
 
@@ -234,6 +242,9 @@ private:
         rclcpp::Publisher<mts_msgs::S2Solution>::SharedPtr m_solution_pub;
         rclcpp::Subscription<mts_msgs::S2Solution>::SharedPtr m_solution_sub;
         std::vector<int> m_solution_vins;
+
+        // temp
+        size_t m_count = 3;
 };
 
 int main(int argc, char * argv[])
