@@ -5,6 +5,7 @@
 
 #include "rclcpp/rclcpp.hpp"
 #include "nav_msgs/msg/occupancy_grid.hpp"
+#include "geometry_msgs/msg/point_stamped.hpp"
 #include "multi_truck_scenario/msg/vehicle_base_data.hpp"
 #include "multi_truck_scenario/msg/s2_solution.hpp"
 
@@ -12,6 +13,10 @@ using namespace std::chrono_literals;
 namespace mts_msgs = multi_truck_scenario::msg;
 
 enum Indicator { off, left, right, warning };
+enum Engine { engine_on, engine_off };
+
+static constexpr auto RAD2DEG { 180 / M_PI };
+
 
 class Vehicle : public rclcpp::Node
 {
@@ -44,6 +49,7 @@ public:
         this->declare_parameter("vin", 0);
         this->declare_parameter("speed", 0.0);
         this->declare_parameter("indicator_state", 0);
+        this->declare_parameter("engine_state", 0);
         
         m_position.point.x = this->get_parameter("position_x").as_double();
         m_position.point.y = this->get_parameter("position_y").as_double();
@@ -54,6 +60,7 @@ public:
         m_vin = this->get_parameter("vin").as_int();
         m_speed = this->get_parameter("speed").as_double();
         m_indicator_state = (Indicator)this->get_parameter("indicator_state").as_int();
+        m_engine_state = (Engine)this->get_parameter("engine_state").as_int();
     }
 
     void set_position(geometry_msgs::msg::PointStamped point)
@@ -86,6 +93,7 @@ private:
 
         // build the base data package 
         auto vehicle_base_data = mts_msgs::VehicleBaseData();
+        vehicle_base_data.engine_state = m_engine_state;
         vehicle_base_data.position = m_position;
         vehicle_base_data.direction = m_direction;
         vehicle_base_data.speed = m_speed;
@@ -95,31 +103,57 @@ private:
         m_vehicle_pub->publish(vehicle_base_data);
     }
 
+   geometry_msgs::msg::PointStamped substract(geometry_msgs::msg::PointStamped& p1, geometry_msgs::msg::PointStamped& p2)
+   {
+        auto tmp = geometry_msgs::msg::PointStamped();
+        tmp.point.x = p2.point.x - p1.point.x;
+        tmp.point.y = p2.point.y - p1.point.y;
+        return tmp;
+   }
+
     void solve_scenario_s2()
     {
         int winner_vin = -1;
-
         for (const auto& v1 : m_vehicles)
         {
-            double angle = v1.second->direction; // 0, 90, 180, 270
+            size_t count = 0;
+            // get the adjustment value so that v1.direction - adjustment_value equals 90
+            const auto adjust_angle = 90 - v1.second->direction;
+            const auto adjusted_v1_angle= v1.second->direction + adjust_angle; 
+
             for (const auto& v2 : m_vehicles)
             {
                 if (v1 == v2) continue;
 
-                angle = angle == 270.0 ? 0.0 : angle + 90.0;
-                if (angle == v2.second->direction) continue;
+                const auto diff = substract(v1.second->position, v2.second->position);
+                
+                auto diff_angle = std::atan2(diff.point.y, diff.point.x) * RAD2DEG;
+                diff_angle += adjust_angle; // also adjust the angle of the differenz vector
 
-                // no car to the right
-                // send the solution
+                if (diff_angle < 0)
+                {
+                    diff_angle += 360;
+                }
+
+                if (diff_angle >= adjusted_v1_angle)
+                {
+                    count++;
+                }
+            }
+
+             // if all cars are not "right" than this one has to drive
+            if (count == m_vehicles.size() - 1)
+            {
                 winner_vin = v1.second->vin;
             }
-        }
-                auto solution = mts_msgs::S2Solution();
-                solution.header.stamp = rclcpp::Clock().now();
-                solution.author_vin = m_vin;
-                solution.winner_vin = winner_vin;
-                
-                m_solution_pub->publish(solution);
+        } 
+
+        auto solution = mts_msgs::S2Solution();
+        solution.header.stamp = rclcpp::Clock().now();
+        solution.author_vin = m_vin;
+        solution.winner_vin = winner_vin;
+        
+        m_solution_pub->publish(solution);
     }
 
 
@@ -147,6 +181,7 @@ private:
         int m_vin;
         geometry_msgs::msg::PointStamped m_position;
         Indicator m_indicator_state = Indicator::off;
+        Engine m_engine_state = Engine::engine_on;
 
         rclcpp::TimerBase::SharedPtr m_timer;
         rclcpp::Publisher<mts_msgs::VehicleBaseData>::SharedPtr m_vehicle_pub;
