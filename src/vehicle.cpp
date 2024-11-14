@@ -2,8 +2,10 @@
 #include <functional>
 #include <memory>
 #include <string>
+#include <cmath> // für std::sqrt
 #include <random>
 
+#include "std_msgs/msg/header.hpp"
 #include "rclcpp/rclcpp.hpp"
 #include "nav_msgs/msg/occupancy_grid.hpp"
 #include "geometry_msgs/msg/point_stamped.hpp"
@@ -13,8 +15,8 @@
 using namespace std::chrono_literals;
 namespace mts_msgs = multi_truck_scenario::msg;
 
-enum Indicator { off, left, right, warning };
-enum Engine { engine_on, engine_off };
+enum class Indicator { off, left, right, warning };
+enum class Engine { on, off };
 
 static constexpr auto RAD2DEG { 180 / M_PI };
 
@@ -35,17 +37,14 @@ public:
             "vehicle_base_data", 10, std::bind(&Vehicle::vehicle_position_callback, this, std::placeholders::_1)
         );
 
-        m_solution_sub = this->create_subscription<mts_msgs::S2Solution>(
+         m_solution_sub = this->create_subscription<mts_msgs::S2Solution>(
             "s2_solution", 10, std::bind(&Vehicle::s2_solution_callback, this, std::placeholders::_1)
         );
 
-        // Timer, der die Position alle 100 ms veröffentlicht
         m_timer = this->create_wall_timer(
             500ms, std::bind(&Vehicle::publish_vehicle, this)
         );
     }
-
-    ~Vehicle() {}
 
     void handle_parameters()
     {
@@ -105,12 +104,13 @@ private:
 
         // build the base data package 
         auto vehicle_base_data = mts_msgs::VehicleBaseData();
-        vehicle_base_data.engine_state = m_engine_state;
+        vehicle_base_data.header.stamp = rclcpp::Clock().now();
+        vehicle_base_data.engine_state = static_cast<int>(m_engine_state);
         vehicle_base_data.position = m_position;
         vehicle_base_data.direction = m_direction;
         vehicle_base_data.speed = m_speed;
         vehicle_base_data.vin = m_vin;
-        vehicle_base_data.indicator_state = m_indicator_state;
+        vehicle_base_data.indicator_state = static_cast<int>(m_indicator_state);
 
         m_vehicle_pub->publish(vehicle_base_data);
     }
@@ -191,23 +191,35 @@ private:
     }
 
 
-    void vehicle_position_callback(const mts_msgs::VehicleBaseData::SharedPtr vehicle_data)
-    {
-        if(!m_is_active)
+   void vehicle_position_callback(const mts_msgs::VehicleBaseData::SharedPtr vehicle_data)
+{
+    if(!m_is_active)
         {
             return;
         }
-            /* this method shall do:
-                - read position & direction & indicator state & vin of up to 2 other vehicles
-            */
-            // Handle the received message
-            // RCLCPP_INFO(this->get_logger(), "Vehicle Info: \n\t VIN: %d \n\t Position: \n\t\t X: %.2f \n\t\t Y: %.2f \n\t\t Z: %.2f \n\t Direction: %.2f \n\t Speed: %.2f \n\t Indicator State: %d", msg->vin, msg->position.point.x, msg->position.point.y, msg->position.point.z, msg->direction, msg->speed, msg->indicator_state);
-            const auto key = vehicle_data->vin;
-            if (m_vehicles.count(key) == 0) 
-            {
-                m_vehicles.emplace(key, vehicle_data);
-                std::cout << (m_vehicles[key]->vin) << std::endl;
-                if (m_vehicles.size() == m_count)
+    auto current_time = rclcpp::Clock().now();
+    
+    auto time_diff = current_time - vehicle_data->header.stamp;
+    
+    // difference over 200 ms -> ignoring the message
+    if (time_diff > 200ms)
+    {
+        return;  // ignoring
+    }
+
+    // filter to consider only active vehicles
+    if (vehicle_standard_filter(vehicle_data) == false)
+    {
+        return;
+    }
+
+    // Handle the received message
+    const auto key = vehicle_data->vin;
+    if (m_vehicles.count(key) == 0) 
+    {
+        m_vehicles.emplace(key, vehicle_data);
+        std::cout << (m_vehicles[key]->vin) << std::endl;
+        if (m_vehicles.size() == m_count)
                 {
                     if (m_count == 4)
                     {
@@ -218,7 +230,24 @@ private:
                         solve_scenario_s2();
                     }
                 }
-            }
+    }
+}
+
+    bool vehicle_standard_filter(const mts_msgs::VehicleBaseData::SharedPtr vehicle_data)
+    {
+        if (vehicle_data->engine_state == static_cast<signed char>(Engine::off))
+        {
+            return false;
+        }
+
+        double dx = vehicle_data->position.point.x - m_position.point.x;
+        double dy = vehicle_data->position.point.y - m_position.point.y;
+        double distance = std::sqrt(dx * dx + dy * dy);
+
+        if (distance <= 1000.0)
+        {
+            return false;
+        }
     }
 
     void s2_solution_callback(const mts_msgs::S2Solution::SharedPtr solution)
@@ -268,7 +297,6 @@ private:
         }
     }
 
-
         bool m_is_active = true;
         // base package informations
         double m_speed;
@@ -276,7 +304,7 @@ private:
         int m_vin;
         geometry_msgs::msg::PointStamped m_position;
         Indicator m_indicator_state = Indicator::off;
-        Engine m_engine_state = Engine::engine_on;
+        Engine m_engine_state = Engine::on;
 
         rclcpp::TimerBase::SharedPtr m_timer;
         std::unordered_map<int, mts_msgs::VehicleBaseData::SharedPtr> m_vehicles;
