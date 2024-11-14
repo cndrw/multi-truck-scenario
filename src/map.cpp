@@ -134,7 +134,7 @@ class Map : public rclcpp::Node
     int m_width;
     int m_height;
     int m_resolution;
-    std::chrono::milliseconds send_frequenzy = 250ms;
+    std::chrono::milliseconds send_frequenzy = 500ms;
     rclcpp::TimerBase::SharedPtr m_timer;
     std::unordered_map<int, mts_msgs::VehicleBaseData::SharedPtr> m_vehicles;
     std::vector<int8_t> m_static_map;

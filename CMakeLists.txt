@@ -39,7 +39,10 @@ add_executable(vehicle_node src/vehicle.cpp)
 
 # Abhängigkeiten setzen
 ament_target_dependencies(map_node rclcpp nav_msgs)
+
 ament_target_dependencies(vehicle_node rclcpp geometry_msgs std_msgs)
+target_include_directories(vehicle_node PRIVATE includes)
+
 rosidl_target_interfaces(map_node ${PROJECT_NAME} "rosidl_typesupport_cpp")
 rosidl_target_interfaces(vehicle_node ${PROJECT_NAME} "rosidl_typesupport_cpp")
 
