@@ -197,7 +197,8 @@ private:
         {
             return;
         }
-    auto current_time = rclcpp::Clock().now();
+
+    auto current_time = this->get_clock()->now();
     
     auto time_diff = current_time - vehicle_data->header.stamp;
     
@@ -244,10 +245,12 @@ private:
         double dy = vehicle_data->position.point.y - m_position.point.y;
         double distance = std::sqrt(dx * dx + dy * dy);
 
-        if (distance <= 1000.0)
+        if (distance >= 1000.0)
         {
             return false;
         }
+
+	return true;
     }
 
     void s2_solution_callback(const mts_msgs::S2Solution::SharedPtr solution)
