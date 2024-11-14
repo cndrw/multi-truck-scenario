@@ -3,10 +3,12 @@
 #include <memory>
 #include <string>
 #include <cmath> // für std::sqrt
+#include <random>
 
 #include "std_msgs/msg/header.hpp"
 #include "rclcpp/rclcpp.hpp"
 #include "nav_msgs/msg/occupancy_grid.hpp"
+#include "geometry_msgs/msg/point_stamped.hpp"
 #include "multi_truck_scenario/msg/vehicle_base_data.hpp"
 #include "multi_truck_scenario/msg/s2_solution.hpp"
 
@@ -15,6 +17,9 @@ namespace mts_msgs = multi_truck_scenario::msg;
 
 enum class Indicator { off, left, right, warning };
 enum class Engine { on, off };
+
+static constexpr auto RAD2DEG { 180 / M_PI };
+
 
 class Vehicle : public rclcpp::Node
 {
@@ -32,7 +37,10 @@ public:
             "vehicle_base_data", 10, std::bind(&Vehicle::vehicle_position_callback, this, std::placeholders::_1)
         );
 
-        // Timer, der die Position alle 500 ms veröffentlicht
+         m_solution_sub = this->create_subscription<mts_msgs::S2Solution>(
+            "s2_solution", 10, std::bind(&Vehicle::s2_solution_callback, this, std::placeholders::_1)
+        );
+
         m_timer = this->create_wall_timer(
             500ms, std::bind(&Vehicle::publish_vehicle, this)
         );
@@ -85,6 +93,11 @@ public:
 private:
     void publish_vehicle()
     {
+        if (!m_is_active)
+        {
+            return;
+        }
+
         // Veröffentlichen der aktuellen Position
         // RCLCPP_INFO(this->get_logger(), "Aktuelle Position: (%.2f, %.2f, %.2f)", m_position.x, m_position.y, m_position.z);
         m_position.header.stamp = rclcpp::Clock().now();
@@ -102,33 +115,72 @@ private:
         m_vehicle_pub->publish(vehicle_base_data);
     }
 
+   geometry_msgs::msg::PointStamped substract(geometry_msgs::msg::PointStamped& p1, geometry_msgs::msg::PointStamped& p2)
+   {
+        auto tmp = geometry_msgs::msg::PointStamped();
+        tmp.point.x = p2.point.x - p1.point.x;
+        tmp.point.y = p2.point.y - p1.point.y;
+        return tmp;
+   }
+
+    void pick_random_vehicle()
+    {
+        bool is_smallest_vin = std::all_of(m_vehicles.begin(), m_vehicles.end(), [this](const auto v) {
+           return m_vin <= v.second->vin;  
+        });
+
+        if (is_smallest_vin)
+        {
+            std::srand(std::time(0)); 
+            int rnd_vin = (std::rand() % 4) + 1; 
+
+
+            
+            auto solution = mts_msgs::S2Solution();
+            solution.header.stamp = rclcpp::Clock().now();
+            solution.author_vin = m_vin;
+            solution.winner_vin = rnd_vin;
+            
+            m_solution_pub->publish(solution);
+        }
+    }
+
     void solve_scenario_s2()
     {
         int winner_vin = -1;
-
         for (const auto& v1 : m_vehicles)
         {
-            double angle = v1.second->direction; // 0, 90, 180, 270
-            int count = 0;
+            size_t count = 0;
+            // get the adjustment value so that v1.direction - adjustment_value equals 90
+            const auto adjust_angle = 90 - v1.second->direction;
+            const auto adjusted_v1_angle= v1.second->direction + adjust_angle; 
 
             for (const auto& v2 : m_vehicles)
             {
                 if (v1 == v2) continue;
 
-                double wanted_angle = angle == 270.0 ? 0.0 : angle + 90.0;
+                const auto diff = substract(v1.second->position, v2.second->position);
+                
+                auto diff_angle = std::atan2(diff.point.y, diff.point.x) * RAD2DEG;
+                diff_angle += adjust_angle; // also adjust the angle of the differenz vector
 
-                // is there a car to the right? Then v1 can't be the winner 
-                if (wanted_angle == v2.second->direction) break;
+                if (diff_angle < 0)
+                {
+                    diff_angle += 360;
+                }
 
-                count++;
+                if (diff_angle >= adjusted_v1_angle)
+                {
+                    count++;
+                }
             }
 
-            // if all cars are not "right" than this one has to drive
-            if (static_cast<size_t>(count) == m_vehicles.size() - 1)
+             // if all cars are not "right" than this one has to drive
+            if (count == m_vehicles.size() - 1)
             {
                 winner_vin = v1.second->vin;
             }
-        }
+        } 
 
         auto solution = mts_msgs::S2Solution();
         solution.header.stamp = rclcpp::Clock().now();
@@ -141,14 +193,17 @@ private:
 
    void vehicle_position_callback(const mts_msgs::VehicleBaseData::SharedPtr vehicle_data)
 {
+    if(!m_is_active)
+        {
+            return;
+        }
     auto current_time = rclcpp::Clock().now();
     
     auto time_diff = current_time - vehicle_data->header.stamp;
     
-    // difference over 600 ms -> ignoring the message
-    if (time_diff > 600ms)
+    // difference over 200 ms -> ignoring the message
+    if (time_diff > 200ms)
     {
-        RCLCPP_INFO(this->get_logger(), "Message too old, ignoring it.");
         return;  // ignoring
     }
 
@@ -164,33 +219,85 @@ private:
     {
         m_vehicles.emplace(key, vehicle_data);
         std::cout << (m_vehicles[key]->vin) << std::endl;
-        if (m_vehicles.size() == 3)
-        {
-            solve_scenario_s2();
-        }
+        if (m_vehicles.size() == m_count)
+                {
+                    if (m_count == 4)
+                    {
+                        pick_random_vehicle();
+                    }
+                    else
+                    {
+                        solve_scenario_s2();
+                    }
+                }
     }
 }
 
     bool vehicle_standard_filter(const mts_msgs::VehicleBaseData::SharedPtr vehicle_data)
     {
-        // Überprüfung, ob das Fahrzeug aktiv ist
         if (vehicle_data->engine_state == static_cast<signed char>(Engine::off))
         {
-            return false;  // Fahrzeug überspringen, wenn es nicht aktiv ist
+            return false;
         }
 
-        // Berechnung der euklidischen Distanz zum Fahrzeug
         double dx = vehicle_data->position.point.x - m_position.point.x;
         double dy = vehicle_data->position.point.y - m_position.point.y;
         double distance = std::sqrt(dx * dx + dy * dy);
 
-        // Wenn das Fahrzeug innerhalb von 1 km ist, fügen wir es der gefilterten Map hinzu
         if (distance <= 1000.0)
         {
             return false;
         }
     }
 
+    void s2_solution_callback(const mts_msgs::S2Solution::SharedPtr solution)
+    {
+        if(!m_is_active)
+        {
+            return;
+        }
+
+        m_solution_vins.push_back(solution->winner_vin);
+
+        if (m_vehicles.size() == 4)
+        {
+            m_vehicles.clear();
+            m_solution_vins.clear();
+            m_count--;
+
+            if (solution->winner_vin == m_vin)
+            {
+                RCLCPP_INFO(this->get_logger(), "kill %d", m_vin);
+                m_is_active = false;
+            }
+           return; 
+        }
+
+        if (m_solution_vins.size() < m_vehicles.size())
+        {
+            return;
+        }
+
+        // check if all vins are the same
+        bool all_equal = std::all_of(m_solution_vins.begin(), m_solution_vins.end(), [this](int vin) {
+            return vin == this->m_solution_vins[0];
+        });
+
+        if (all_equal)
+        {
+            m_vehicles.clear();
+            m_solution_vins.clear();
+            m_count--;
+
+            if (solution->winner_vin == m_vin)
+            {
+                RCLCPP_INFO(this->get_logger(), "kill %d", m_vin);
+                m_is_active = false;
+            }
+        }
+    }
+
+        bool m_is_active = true;
         // base package informations
         double m_speed;
         double m_direction;
@@ -200,10 +307,17 @@ private:
         Engine m_engine_state = Engine::on;
 
         rclcpp::TimerBase::SharedPtr m_timer;
+        std::unordered_map<int, mts_msgs::VehicleBaseData::SharedPtr> m_vehicles;
+
         rclcpp::Publisher<mts_msgs::VehicleBaseData>::SharedPtr m_vehicle_pub;
         rclcpp::Subscription<mts_msgs::VehicleBaseData>::SharedPtr m_vehicle_sub;
-        std::unordered_map<int, mts_msgs::VehicleBaseData::SharedPtr> m_vehicles;
+
         rclcpp::Publisher<mts_msgs::S2Solution>::SharedPtr m_solution_pub;
+        rclcpp::Subscription<mts_msgs::S2Solution>::SharedPtr m_solution_sub;
+        std::vector<int> m_solution_vins;
+
+        // temp
+        size_t m_count = 4;
 };
 
 int main(int argc, char * argv[])
