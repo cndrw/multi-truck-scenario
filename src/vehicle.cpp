@@ -12,6 +12,9 @@
 #include "multi_truck_scenario/msg/vehicle_base_data.hpp"
 #include "multi_truck_scenario/msg/s2_solution.hpp"
 
+#include "scenario_solver.hpp"
+#include "scenario_detector.hpp"
+
 using namespace std::chrono_literals;
 namespace mts_msgs = multi_truck_scenario::msg;
 
@@ -51,6 +54,12 @@ public:
     }
     ~Vehicle() {}
 
+    bool is_active()
+    {
+        return m_is_active;
+    }
+    
+private:
     void handle_parameters()
     {
         this->declare_parameter("position_x", 0.0);
@@ -74,28 +83,6 @@ public:
         m_engine_state = (Engine)this->get_parameter("engine_state").as_int();
     }
 
-    void set_position(geometry_msgs::msg::PointStamped point)
-    {
-        m_position = point;
-        m_position.header.stamp = rclcpp::Clock().now();
-    }
-
-    void set_speed(double speed)
-    {
-        m_speed = speed;
-    }
-
-    void set_direction(double direction)
-    {
-        m_direction = direction;
-    }
-
-    void set_vin(int vin)
-    {
-        m_vin = vin;
-    }
-    
-private:
     void publish_vehicle()
     {
         if (!m_is_active)
