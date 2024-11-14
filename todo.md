@@ -1,5 +1,5 @@
 # TODO:
       
-- [ ] 
 
-- [ ] toni pixelart to map converter
+- [ ] visualisierung fixen (Conrad)
+- [ ] pixelart to map converter (Toni)
