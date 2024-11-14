@@ -20,6 +20,7 @@ enum Colors {
     Black = 100,      // schwarz für 80 bis 100
     Green = 127      // grün (101 bis 127) für Gewinnerfahrzeug in s2_solution_callback
 };
+
 class Map : public rclcpp::Node
 {
   public:
@@ -28,9 +29,16 @@ class Map : public rclcpp::Node
       m_width = 4;
       m_height = 4;
       m_resolution = 1;
-      m_color_map.emplace(1, Colors::Red);
-      m_color_map.emplace(2, Colors::Red);
-      m_color_map.emplace(3, Colors::Red);
+
+      m_grid.resize(m_height * m_width);
+      m_static_map.reserve(m_height * m_width);
+
+      m_static_map = {
+          Colors::Black, Colors::Grey, Colors::Grey, Colors::Black,
+          Colors::Grey, Colors::Grey, Colors::Grey, Colors::Grey,
+          Colors::Grey, Colors::Grey, Colors::Grey, Colors::Grey,
+          Colors::Black, Colors::Grey, Colors::Grey, Colors::Black,
+      };
 
 
       m_grid_pub = this->create_publisher<nav_msgs::msg::OccupancyGrid>("map_data", 10);
@@ -65,23 +73,13 @@ class Map : public rclcpp::Node
       grid.info.origin.orientation.y = 0;
       grid.info.origin.orientation.z = 0;
       grid.info.origin.orientation.w = 1;
-    
-      grid.data = {
-          Colors::Black, Colors::Grey, Colors::Grey, Colors::Black,
-          Colors::Grey, Colors::Grey, Colors::Grey, Colors::Grey,
-          Colors::Grey, Colors::Grey, Colors::Grey, Colors::Grey,
-          Colors::Black, Colors::Grey, Colors::Grey, Colors::Black,
-      };
 
-    // update vehicle position on the grid 
-    for (const auto& vehicle : m_vehicles)
-    {
-      const int x = vehicle.second->position.point.x;
-      const int y = vehicle.second->position.point.y;
-      grid.data[x + y * m_width] = m_color_map[vehicle.first];
-    }
+      add_to_map(m_static_map);
+      grid.data = m_grid;
 
       m_grid_pub->publish(grid);
+
+      clear_map();
     }
 
     void vehicle_position_callback(const mts_msgs::VehicleBaseData::SharedPtr vehicle_data)
@@ -90,25 +88,57 @@ class Map : public rclcpp::Node
       if (m_vehicles.count(key) == 0) 
       {
         m_vehicles.emplace(key, vehicle_data);
+        m_color_map.emplace(key, Colors::Red);
       }
       else 
       {
         m_vehicles[key] = vehicle_data;
       }
+
+      set_vehicle_color(key);
     }
 
     void s2_solution_callback(const mts_msgs::S2Solution::SharedPtr solution)
     {
-        RCLCPP_INFO(this->get_logger(), "winner vin: %d", solution->winner_vin);
-        m_color_map[solution->winner_vin] = Colors::Green;
+        const auto vin = solution->winner_vin;
+
+        // set the winner green
+        m_color_map[vin] = Colors::Green;
+
+        set_vehicle_color(vin);
+    }
+
+    void set_vehicle_color(const int vin)
+    {
+        const auto& pos = m_vehicles[vin]->position.point;
+        m_grid[pos.x + pos.y * m_width] = m_color_map[vin];
+    }
+
+    void add_to_map(const std::vector<int8_t>& grid)
+    {
+      for (size_t i = 0; i < m_grid.size(); i++)
+      {
+        if (grid[i] == Colors::Grey) continue;
+        m_grid[i] = grid[i];
+      }
+    }
+
+    void clear_map()
+    {
+      for (auto& cell : m_grid)
+      {
+        cell = 0;
+      }
     }
 
     int m_width;
     int m_height;
     int m_resolution;
-    std::chrono::milliseconds send_frequenzy = 500ms;
+    std::chrono::milliseconds send_frequenzy = 250ms;
     rclcpp::TimerBase::SharedPtr m_timer;
     std::unordered_map<int, mts_msgs::VehicleBaseData::SharedPtr> m_vehicles;
+    std::vector<int8_t> m_static_map;
+    std::vector<int8_t> m_grid;
     std::unordered_map<int, int> m_color_map;
     rclcpp::Publisher<nav_msgs::msg::OccupancyGrid>::SharedPtr m_grid_pub;
     rclcpp::Subscription<mts_msgs::VehicleBaseData>::SharedPtr m_vehicle_sub;
