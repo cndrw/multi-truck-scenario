@@ -1,22 +1,36 @@
 import launch
 from launch import LaunchDescription
 from launch_ros.actions import Node
-import os
-from ament_index_python.packages import get_package_share_directory
+import random
+
+## make sure to choose one option of the following, don't forget the map node
+## --------------------------------------------------------------------------------
+## os option - older and less intuitive
+# import os
+# workspace_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+# config_file_path = os.path.join(workspace_dir, 'config', 'config_1.rviz')
 
 ## --------------------------------------------------------------------------------
-
-# Get the current working directory (workspace directory)
-workspace_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', '..', '..', '..'))
-
-# Construct the path to the config file directly from the src directory
-config_file_path = os.path.join(workspace_dir, 'src', 'multi-truck-scenario', 'config', 'config_1.rviz')
-
-## Hard coded should be fixed later, works on my machine
-
+## Pathlib option - more modern and recommended
+from pathlib import Path
+workspace_dir = Path(__file__).resolve().parent.parent
+config_file_path = workspace_dir / 'config' / 'config_1.rviz'
+config_file_path = config_file_path.resolve()
+## --------------------------------------------------------------------------------
+# import the image2grid script and execute it for the map node
+#from script.image2grid_converter import generate_cpp_grid_from_image
+# specify path of image using Pathlib
+#scenario_S2_map_path = workspace_dir / 'script' / 'painting_10x10_6_colors.png'
+# convert image to grid data - see below for the implementation of the parameters
+#grid_values = generate_cpp_grid_from_image(scenario_S2_map_path)
+## --------------------------------------------------------------------------------
 
 def generate_launch_description():
     
+    no_of_vehicles = 3 # set how many offsets are created
+    dir_offset = 5 # offset in degrees
+    offset_val_list = [random.uniform(-1 * dir_offset, dir_offset) for i in range(no_of_vehicles)] # random offset values
+
     vehicles = [
         {'name': 'vehicle_1', 'vin': 1, 'engine': 0, 'speed': 0.0, 'indicator': 0, 'position_x': 2.0, 'position_y': 0.0, 'position_z': 0.0, 'direction_angle': 90.0},
         {'name': 'vehicle_2', 'vin': 2, 'engine': 0, 'speed': 0.0, 'indicator': 0, 'position_x': 3.0, 'position_y': 2.0, 'position_z': 0.0, 'direction_angle': 180.0}, 
@@ -51,6 +65,13 @@ def generate_launch_description():
             package='multi_truck_scenario',
             executable='map_node',
             name='map_simulation',
+            ## add parameter for grid data
+            ## parameters not yet implemented in map.cpp
+            # parameters=[{
+            #     'height': grid_values['height'],
+            #     'width': grid_values['width'],
+            #     'grid_data': grid_values['cpp_grid_data'],
+            # }],
         ),
         # launch rviz2 for 
         Node(
@@ -58,6 +79,7 @@ def generate_launch_description():
             executable='rviz2',
             name='rviz2',
             output='screen',
-            arguments = ['-d', config_file_path],  # Optional: specify a config file
+            arguments = ['-d', str(config_file_path)],  # Pathlib option - type casting is needed
+            # arguments = ['-d', config_file_path],  # os option
         )
     ])
