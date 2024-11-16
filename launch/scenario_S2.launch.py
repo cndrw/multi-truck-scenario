@@ -27,10 +27,6 @@ config_file_path = config_file_path.resolve()
 
 def generate_launch_description():
     
-    no_of_vehicles = 3 # set how many offsets are created
-    dir_offset = 5 # offset in degrees
-    offset_val_list = [random.uniform(-1 * dir_offset, dir_offset) for i in range(no_of_vehicles)] # random offset values
-
     vehicles = [
         {'name': 'vehicle_1', 'vin': 1, 'speed': 0.0, 'indicator': 0, 'position_x': 2.0, 'position_y': 0.0, 'position_z': 0.0, 'direction_angle': 90.0 + offset_val_list[0]},
         {'name': 'vehicle_2', 'vin': 2, 'speed': 0.0, 'indicator': 0, 'position_x': 3.0, 'position_y': 2.0, 'position_z': 0.0, 'direction_angle': 180.0 + offset_val_list[1]},
@@ -38,6 +34,13 @@ def generate_launch_description():
         # {'name': 'vehicle_4', 'vin': 3, 'speed': 0, 'indicator': 0, 'position_x': 3, 'position_y': 1, 'position_z': 0, 'direction_angle': 0},
         # Add more vehicles as needed
     ]
+
+    dir_offset = 5 # offset in degrees
+    offset_val_list = [random.uniform(-dir_offset, dir_offset) for i in range(len(vehicles))] # random offset values
+
+    # add small offset to each angle
+    for i, v in enumerate(vehicles):
+        v['direction_angle'] += offset_val_list[i]
 
     vehicle_nodes = []
     for vehicle in vehicles:
