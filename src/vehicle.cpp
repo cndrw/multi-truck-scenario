@@ -27,9 +27,11 @@ static constexpr auto RAD2DEG { 180 / M_PI };
 class Vehicle : public rclcpp::Node
 {
 public:
-    Vehicle() : rclcpp::Node("vehicle")
+    Vehicle(): rclcpp::Node("vehicle")
     {
         handle_parameters();
+        m_scenario_solver.set_owner(m_vin);
+
         // Publisher der die Daten der Instanz veröffentlicht
         m_vehicle_pub = this->create_publisher<mts_msgs::VehicleBaseData>("vehicle_base_data", 10);
 
@@ -167,21 +169,71 @@ private:
         {
             return;
         }
-            /* this method shall do:
-                - read position & direction & indicator state & vin of up to 2 other vehicles
-            */
-            // Handle the received message
-            // RCLCPP_INFO(this->get_logger(), "Vehicle Info: \n\t VIN: %d \n\t Position: \n\t\t X: %.2f \n\t\t Y: %.2f \n\t\t Z: %.2f \n\t Direction: %.2f \n\t Speed: %.2f \n\t Indicator State: %d", msg->vin, msg->position.point.x, msg->position.point.y, msg->position.point.z, msg->direction, msg->speed, msg->indicator_state);
-            const auto key = vehicle_data->vin;
-            if (m_vehicles.count(key) == 0) 
+
+        auto current_time = this->get_clock()->now();
+        
+        auto time_diff = current_time - vehicle_data->header.stamp;
+        
+        // difference over 200 ms -> ignoring the message
+        if (time_diff > 200ms)
+        {
+            return;  // ignoring
+        }
+
+        // filter to consider only active vehicles
+        if (vehicle_standard_filter(vehicle_data) == false)
+        {
+            return;
+        }
+
+        // Handle the received message
+        const auto key = vehicle_data->vin;
+        if (m_vehicles.count(key) == 0) 
+        {
+            m_vehicles.emplace(key, vehicle_data);
+            std::cout << (m_vehicles[key]->vin) << std::endl;
+            if (m_vehicles.size() == m_count)
             {
-                m_vehicles.emplace(key, vehicle_data);
-                std::cout << (m_vehicles[key]->vin) << std::endl;
-                if (m_vehicles.size() == m_count)
+                // get the list of vehicles from the map
+                std::vector<mts_msgs::VehicleBaseData::SharedPtr> vehicles;
+                vehicles.reserve(m_vehicles.size());
+                for (const auto v : m_vehicles)
                 {
-                    solve_scenario_s2();
+                    vehicles.push_back(v.second);
+                }
+
+                if (const auto solution = m_scenario_solver.solve(Scenario::S2, vehicles))
+                {
+                    auto solution_msg = mts_msgs::S2Solution();
+                    solution_msg.author_vin = solution->author_vin;
+                    solution_msg.winner_vin = solution->winner_vin;
+                    m_solution_pub->publish(solution_msg);
+                }
+                else
+                {
+                    RCLCPP_INFO(this->get_logger(), "solution not valid");
                 }
             }
+        }
+    }
+
+    bool vehicle_standard_filter(const mts_msgs::VehicleBaseData::SharedPtr vehicle_data)
+    {
+        if (vehicle_data->engine_state == static_cast<signed char>(Engine::off))
+        {
+            return false;
+        }
+
+        double dx = vehicle_data->position.point.x - m_position.point.x;
+        double dy = vehicle_data->position.point.y - m_position.point.y;
+        double distance = std::sqrt(dx * dx + dy * dy);
+
+        if (distance >= 1000.0)
+        {
+            return false;
+        }
+
+        return true;
     }
 
     void s2_solution_callback(const mts_msgs::S2Solution::SharedPtr solution)
@@ -286,6 +338,8 @@ private:
         rclcpp::Publisher<mts_msgs::S2Solution>::SharedPtr m_solution_pub;
         rclcpp::Subscription<mts_msgs::S2Solution>::SharedPtr m_solution_sub;
         std::vector<int> m_solution_vins;
+
+        ScenarioSolver m_scenario_solver;
 
         // temp
         size_t m_count = 3;

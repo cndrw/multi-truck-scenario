@@ -33,6 +33,11 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   DEPENDENCIES geometry_msgs std_msgs
 )
 
+add_library(scenario_lib
+  STATIC src/scenario_solver.cpp
+         src/scenario_detector.cpp
+) 
+
 # Ausführbares Ziel
 add_executable(map_node src/map.cpp)
 add_executable(vehicle_node src/vehicle.cpp)
@@ -42,16 +47,22 @@ ament_target_dependencies(map_node rclcpp nav_msgs)
 
 ament_target_dependencies(vehicle_node rclcpp geometry_msgs std_msgs)
 target_include_directories(vehicle_node PRIVATE includes)
+target_include_directories(scenario_lib PRIVATE includes)
+
+target_link_libraries(vehicle_node scenario_lib)
 
 rosidl_target_interfaces(map_node ${PROJECT_NAME} "rosidl_typesupport_cpp")
 rosidl_target_interfaces(vehicle_node ${PROJECT_NAME} "rosidl_typesupport_cpp")
+rosidl_target_interfaces(scenario_lib ${PROJECT_NAME} "rosidl_typesupport_cpp")
+
 
 
 # Installation
-install(TARGETS
-  map_node
-  vehicle_node
-  DESTINATION lib/${PROJECT_NAME})
+install(
+  TARGETS map_node
+          vehicle_node
+          DESTINATION lib/${PROJECT_NAME}
+)
 
 
 # Testen
