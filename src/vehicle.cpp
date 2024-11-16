@@ -27,9 +27,11 @@ static constexpr auto RAD2DEG { 180 / M_PI };
 class Vehicle : public rclcpp::Node
 {
 public:
-    Vehicle() : rclcpp::Node("vehicle")
+    Vehicle(): rclcpp::Node("vehicle")
     {
         handle_parameters();
+        m_scenario_solver.set_owner(m_vin);
+
         // Publisher der die Daten der Instanz veröffentlicht
         m_vehicle_pub = this->create_publisher<mts_msgs::VehicleBaseData>("vehicle_base_data", 10);
 
@@ -102,124 +104,60 @@ private:
         m_vehicle_pub->publish(vehicle_base_data);
     }
 
-   geometry_msgs::msg::PointStamped substract(geometry_msgs::msg::PointStamped& p1, geometry_msgs::msg::PointStamped& p2)
-   {
-        auto tmp = geometry_msgs::msg::PointStamped();
-        tmp.point.x = p2.point.x - p1.point.x;
-        tmp.point.y = p2.point.y - p1.point.y;
-        return tmp;
-   }
 
-    void pick_random_vehicle()
+    void vehicle_position_callback(const mts_msgs::VehicleBaseData::SharedPtr vehicle_data)
     {
-        bool is_smallest_vin = std::all_of(m_vehicles.begin(), m_vehicles.end(), [this](const auto v) {
-           return m_vin <= v.second->vin;  
-        });
-
-        if (is_smallest_vin)
-        {
-            std::srand(std::time(0)); 
-            int rnd_vin = (std::rand() % 4) + 1; 
-
-
-            
-            auto solution = mts_msgs::S2Solution();
-            solution.header.stamp = rclcpp::Clock().now();
-            solution.author_vin = m_vin;
-            solution.winner_vin = rnd_vin;
-            
-            m_solution_pub->publish(solution);
-        }
-    }
-
-    void solve_scenario_s2()
-    {
-        int winner_vin = -1;
-        for (const auto& v1 : m_vehicles)
-        {
-            size_t count = 0;
-            // get the adjustment value so that v1.direction - adjustment_value equals 90
-            const auto adjust_angle = 90 - v1.second->direction;
-            const auto adjusted_v1_angle= v1.second->direction + adjust_angle; 
-
-            for (const auto& v2 : m_vehicles)
-            {
-                if (v1 == v2) continue;
-
-                const auto diff = substract(v1.second->position, v2.second->position);
-                
-                auto diff_angle = std::atan2(diff.point.y, diff.point.x) * RAD2DEG;
-                diff_angle += adjust_angle; // also adjust the angle of the differenz vector
-
-                if (diff_angle < 0)
-                {
-                    diff_angle += 360;
-                }
-
-                if (diff_angle >= adjusted_v1_angle)
-                {
-                    count++;
-                }
-            }
-
-             // if all cars are not "right" than this one has to drive
-            if (count == m_vehicles.size() - 1)
-            {
-                winner_vin = v1.second->vin;
-            }
-        } 
-
-        auto solution = mts_msgs::S2Solution();
-        solution.header.stamp = rclcpp::Clock().now();
-        solution.author_vin = m_vin;
-        solution.winner_vin = winner_vin;
-        
-        m_solution_pub->publish(solution);
-    }
-
-
-   void vehicle_position_callback(const mts_msgs::VehicleBaseData::SharedPtr vehicle_data)
-{
-    if(!m_is_active)
+        if(!m_is_active)
         {
             return;
         }
 
-    auto current_time = this->get_clock()->now();
-    
-    auto time_diff = current_time - vehicle_data->header.stamp;
-    
-    // difference over 200 ms -> ignoring the message
-    if (time_diff > 200ms)
-    {
-        return;  // ignoring
-    }
+        auto current_time = this->get_clock()->now();
+        
+        auto time_diff = current_time - vehicle_data->header.stamp;
+        
+        // difference over 200 ms -> ignoring the message
+        if (time_diff > 200ms)
+        {
+            return;  // ignoring
+        }
 
-    // filter to consider only active vehicles
-    if (vehicle_standard_filter(vehicle_data) == false)
-    {
-        return;
-    }
+        // filter to consider only active vehicles
+        if (vehicle_standard_filter(vehicle_data) == false)
+        {
+            return;
+        }
 
-    // Handle the received message
-    const auto key = vehicle_data->vin;
-    if (m_vehicles.count(key) == 0) 
-    {
-        m_vehicles.emplace(key, vehicle_data);
-        std::cout << (m_vehicles[key]->vin) << std::endl;
-        if (m_vehicles.size() == m_count)
+        // Handle the received message
+        const auto key = vehicle_data->vin;
+        if (m_vehicles.count(key) == 0) 
+        {
+            m_vehicles.emplace(key, vehicle_data);
+            std::cout << (m_vehicles[key]->vin) << std::endl;
+            if (m_vehicles.size() == m_count)
+            {
+                // get the list of vehicles from the map
+                std::vector<mts_msgs::VehicleBaseData::SharedPtr> vehicles;
+                vehicles.reserve(m_vehicles.size());
+                for (const auto v : m_vehicles)
                 {
-                    if (m_count == 4)
-                    {
-                        pick_random_vehicle();
-                    }
-                    else
-                    {
-                        solve_scenario_s2();
-                    }
+                    vehicles.push_back(v.second);
                 }
+
+                if (const auto solution = m_scenario_solver.solve(Scenario::S2, vehicles))
+                {
+                    auto solution_msg = mts_msgs::S2Solution();
+                    solution_msg.author_vin = solution->author_vin;
+                    solution_msg.winner_vin = solution->winner_vin;
+                    m_solution_pub->publish(solution_msg);
+                }
+                else
+                {
+                    RCLCPP_INFO(this->get_logger(), "solution not valid");
+                }
+            }
+        }
     }
-}
 
     bool vehicle_standard_filter(const mts_msgs::VehicleBaseData::SharedPtr vehicle_data)
     {
@@ -237,7 +175,7 @@ private:
             return false;
         }
 
-	return true;
+        return true;
     }
 
     void s2_solution_callback(const mts_msgs::S2Solution::SharedPtr solution)
@@ -305,6 +243,8 @@ private:
         rclcpp::Publisher<mts_msgs::S2Solution>::SharedPtr m_solution_pub;
         rclcpp::Subscription<mts_msgs::S2Solution>::SharedPtr m_solution_sub;
         std::vector<int> m_solution_vins;
+
+        ScenarioSolver m_scenario_solver;
 
         // temp
         size_t m_count = 4;
