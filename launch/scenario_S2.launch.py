@@ -39,8 +39,8 @@ def generate_launch_description():
     offset_val_list = [random.uniform(-dir_offset, dir_offset) for i in range(len(vehicles))] # random offset values
 
     # add small offset to each angle
-    for i, v in enumerate(vehicles):
-        v['direction_angle'] += offset_val_list[i]
+    # for i, v in enumerate(vehicles):
+        # v['direction_angle'] += offset_val_list[i]
 
     vehicle_nodes = []
     for vehicle in vehicles:
