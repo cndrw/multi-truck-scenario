@@ -22,6 +22,7 @@ enum class Indicator { off, left, right, warning };
 enum class Engine { on, off };
 
 static constexpr auto RAD2DEG { 180 / M_PI };
+static constexpr auto DEG2RAD { M_PI / 180 };
 
 
 class Vehicle : public rclcpp::Node
@@ -50,7 +51,6 @@ public:
         // Timer, der die Position alle 100 ms veröffentlicht
         // Timer, der die Position alle 100 ms veröffentlicht
         m_timer = this->create_wall_timer(
-            500ms, std::bind(&Vehicle::publish_vehicle, this)
             500ms, std::bind(&Vehicle::publish_vehicle, this)
         );
     }
@@ -85,17 +85,16 @@ private:
         m_engine_state = (Engine)this->get_parameter("engine_state").as_int();
     }
 
-    void publish_vehicle()
+    void update()
     {
         if (!m_is_active)
         {
             return;
         }
 
-        // Veröffentlichen der aktuellen Position
-        // RCLCPP_INFO(this->get_logger(), "Aktuelle Position: (%.2f, %.2f, %.2f)", m_position.x, m_position.y, m_position.z);
-        m_position.header.stamp = rclcpp::Clock().now();
+        move_vehicle();
 
+        m_position.header.stamp = rclcpp::Clock().now();
         // build the base data package 
         auto vehicle_base_data = mts_msgs::VehicleBaseData();
         vehicle_base_data.header.stamp = rclcpp::Clock().now();
@@ -109,57 +108,23 @@ private:
         m_vehicle_pub->publish(vehicle_base_data);
     }
 
-   geometry_msgs::msg::PointStamped substract(geometry_msgs::msg::PointStamped& p1, geometry_msgs::msg::PointStamped& p2)
-   {
-        auto tmp = geometry_msgs::msg::PointStamped();
-        tmp.point.x = p2.point.x - p1.point.x;
-        tmp.point.y = p2.point.y - p1.point.y;
-        return tmp;
-   }
-
-    void solve_scenario_s2()
+    void move_vehicle()
     {
-        int winner_vin = -1;
-        for (const auto& v1 : m_vehicles)
-        {
-            size_t count = 0;
-            // get the adjustment value so that v1.direction - adjustment_value equals 90
-            const auto adjust_angle = 90 - v1.second->direction;
-            const auto adjusted_v1_angle= v1.second->direction + adjust_angle; 
+        static rclcpp::Time last_time = this->get_clock()->now();
+        const auto now_time = this->get_clock()->now();
+        const auto delta_time = now_time - last_time;
 
-            for (const auto& v2 : m_vehicles)
-            {
-                if (v1 == v2) continue;
+        // get driving direction
+        const double dy = std::sin(m_direction * DEG2RAD);
+        const double dx = std::cos(m_direction * DEG2RAD);
 
-                const auto diff = substract(v1.second->position, v2.second->position);
-                
-                auto diff_angle = std::atan2(diff.point.y, diff.point.x) * RAD2DEG;
-                diff_angle += adjust_angle; // also adjust the angle of the differenz vector
+        const double delta_move = m_speed * delta_time.seconds();
+        m_position.point.x += delta_move * dx;
+        m_position.point.y += delta_move * dy;
 
-                if (diff_angle < 0)
-                {
-                    diff_angle += 360;
-                }
+        // RCLCPP_INFO(get_logger(), "pos.x: %f, pos.y: %f,  dx: %f, move: %f", m_position.point.x, m_position.point.y, dx, dx * delta_move);
 
-                if (diff_angle >= adjusted_v1_angle)
-                {
-                    count++;
-                }
-            }
-
-             // if all cars are not "right" than this one has to drive
-            if (count == m_vehicles.size() - 1)
-            {
-                winner_vin = v1.second->vin;
-            }
-        } 
-
-        auto solution = mts_msgs::S2Solution();
-        solution.header.stamp = rclcpp::Clock().now();
-        solution.author_vin = m_vin;
-        solution.winner_vin = winner_vin;
-        
-        m_solution_pub->publish(solution);
+        last_time = now_time;
     }
 
 
@@ -186,12 +151,22 @@ private:
             return;
         }
 
+        // "S2 filter"
+        if (vehicle_data->speed != 0)
+        {
+            return;
+        }
+
+        if (m_solution_delay - this->get_clock()->now().seconds() > 0)
+        {
+            return;
+        }
+
         // Handle the received message
         const auto key = vehicle_data->vin;
         if (m_vehicles.count(key) == 0) 
         {
             m_vehicles.emplace(key, vehicle_data);
-            std::cout << (m_vehicles[key]->vin) << std::endl;
             if (m_vehicles.size() == m_count)
             {
                 // get the list of vehicles from the map
@@ -202,7 +177,8 @@ private:
                     vehicles.push_back(v.second);
                 }
 
-                if (const auto solution = m_scenario_solver.solve(Scenario::S2, vehicles))
+                const auto solution = m_scenario_solver.solve(Scenario::S2, vehicles);
+                if (solution != nullptr)
                 {
                     auto solution_msg = mts_msgs::S2Solution();
                     solution_msg.author_vin = solution->author_vin;
@@ -244,6 +220,24 @@ private:
         }
 
         m_solution_vins.push_back(solution->winner_vin);
+
+        if (m_vehicles.size() == 4)
+        {
+            m_vehicles.clear();
+            m_solution_vins.clear();
+            m_count--;
+            m_solution_delay = this->get_clock()->now().seconds() + m_delay_time;
+            RCLCPP_INFO(get_logger(), "set delay: %f", m_solution_delay);
+
+            if (solution->winner_vin == m_vin)
+            {
+                RCLCPP_INFO(this->get_logger(), "kill %d", m_vin);
+                // m_is_active = false;
+                m_speed = 1.0;
+            }
+           return; 
+        }
+
         if (m_solution_vins.size() < m_vehicles.size())
         {
             return;
@@ -259,11 +253,14 @@ private:
             m_vehicles.clear();
             m_solution_vins.clear();
             m_count--;
+            m_solution_delay = this->get_clock()->now().seconds() + m_delay_time;
+            RCLCPP_INFO(get_logger(), "set delay: %f", m_solution_delay);
 
             if (solution->winner_vin == m_vin)
             {
                 RCLCPP_INFO(this->get_logger(), "kill %d", m_vin);
-                m_is_active = false;
+                // m_is_active = false;
+                m_speed = 1.0;
             }
         }
     }
@@ -342,7 +339,9 @@ private:
         ScenarioSolver m_scenario_solver;
 
         // temp
-        size_t m_count = 3;
+        size_t m_count = 4;
+        double m_solution_delay;
+        double m_delay_time = 3;
 };
 
 int main(int argc, char * argv[])

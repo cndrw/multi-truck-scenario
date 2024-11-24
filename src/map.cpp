@@ -84,18 +84,28 @@ class Map : public rclcpp::Node
 
     void vehicle_position_callback(const mts_msgs::VehicleBaseData::SharedPtr vehicle_data)
     {
-      const auto key = vehicle_data->vin;
-      if (m_vehicles.count(key) == 0) 
-      {
-        m_vehicles.emplace(key, vehicle_data);
-        m_color_map.emplace(key, Colors::Red);
-      }
-      else 
-      {
-        m_vehicles[key] = vehicle_data;
-      }
+        if (is_out_of_bound(vehicle_data->position.point))
+        {
+            return;
+        } 
 
-      set_vehicle_color(key);
+        const auto key = vehicle_data->vin;
+        if (m_vehicles.count(key) == 0) 
+        {
+            m_vehicles.emplace(key, vehicle_data);
+            m_color_map.emplace(key, Colors::Red);
+        }
+        else 
+        {
+            m_vehicles[key] = vehicle_data;
+        }
+
+        set_vehicle_color(key);
+    }
+
+    bool is_out_of_bound(const geometry_msgs::msg::Point& pos)
+    {
+        return pos.x >= m_width || pos.x < 0 || pos.y >= m_height || pos.y < 0;
     }
 
     void s2_solution_callback(const mts_msgs::S2Solution::SharedPtr solution)
@@ -111,16 +121,21 @@ class Map : public rclcpp::Node
     void set_vehicle_color(const int vin)
     {
         const auto& pos = m_vehicles[vin]->position.point;
-        m_grid[pos.x + pos.y * m_width] = m_color_map[vin];
+
+        // round to the second deximal place and then floor them to fit the grid
+        const auto rpos_x = std::floor(std::ceil(pos.x * 100.0) / 100.0);
+        const auto rpos_y = std::floor(std::ceil(pos.y * 100.0) / 100.0);
+
+        m_grid[rpos_x + rpos_y * m_width] = m_color_map[vin];
     }
 
     void add_to_map(const std::vector<int8_t>& grid)
     {
-      for (size_t i = 0; i < m_grid.size(); i++)
-      {
-        if (grid[i] == Colors::Grey) continue;
-        m_grid[i] = grid[i];
-      }
+        for (size_t i = 0; i < m_grid.size(); i++)
+        {
+            if (grid[i] == Colors::Grey) continue;
+            m_grid[i] = grid[i];
+        }
     }
 
     void clear_map()
