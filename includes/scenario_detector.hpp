@@ -3,6 +3,7 @@
 enum class Scenario
 {
     None,
+    S1,
     S2
 };
 

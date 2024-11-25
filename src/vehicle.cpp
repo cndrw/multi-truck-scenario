@@ -151,8 +151,8 @@ private:
             return;
         }
 
-        // "S2 filter"
-        if (vehicle_data->speed != 0)
+        // "S2 filter" until scenario detector is build if you own vehicle is moving -> not calculating any sceario
+        if (vehicle_data->speed != 0 || m_speed != 0)
         {
             return;
         }
@@ -227,7 +227,6 @@ private:
             m_solution_vins.clear();
             m_count--;
             m_solution_delay = this->get_clock()->now().seconds() + m_delay_time;
-            RCLCPP_INFO(get_logger(), "set delay: %f", m_solution_delay);
 
             if (solution->winner_vin == m_vin)
             {
@@ -254,7 +253,6 @@ private:
             m_solution_vins.clear();
             m_count--;
             m_solution_delay = this->get_clock()->now().seconds() + m_delay_time;
-            RCLCPP_INFO(get_logger(), "set delay: %f", m_solution_delay);
 
             if (solution->winner_vin == m_vin)
             {
@@ -341,7 +339,7 @@ private:
         // temp
         size_t m_count = 4;
         double m_solution_delay;
-        double m_delay_time = 3;
+        double m_delay_time = 2;
 };
 
 int main(int argc, char * argv[])
