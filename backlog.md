@@ -2,7 +2,7 @@
 
 ## Sprint Backlog
 - [ ] nächstes Scenario überlegen/konzipieren (S1)
-- [x] Fzg in simulation bewegen (letzes fzg fährt nicht - lösung scenario detector muss implementiert sein)
+- [x] Fzg in simulation bewegen (tempäre lösung scenario detector muss implementiert sein)
 - [ ] andere möglichkeiten für scenario detektion/lösung recherchieren
 - [ ] weekly targets roadmap erstellen
 
