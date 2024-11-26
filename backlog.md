@@ -5,7 +5,7 @@
 - [x] nächsten Szenarien beschreibungs chapter schreiben (S1 zunächst)
 - [x] Fzg in simulation bewegen (tempäre lösung scenario detector muss implementiert sein)
 - [x] Szenariobaum chapter schreiben
-- [ ] andere möglichkeiten für scenario detektion/lösung recherchieren
+- [x] andere möglichkeiten für scenario detektion/lösung recherchieren
 
 ## Backlog
 - [ ] Scenario Detector überlegen/konzipieren
