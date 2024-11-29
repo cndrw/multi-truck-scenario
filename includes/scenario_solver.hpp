@@ -26,9 +26,11 @@ public:
 
 
 private:
+    void solve_s1();
     void solve_s2();
     void pick_random_vehicle();
     void solve_right_of_way();
+    int solve_S1_vorfahrt();
 
     // geometry util functions
     geometry_msgs::msg::PointStamped substract(const geometry_msgs::msg::PointStamped& p1, const geometry_msgs::msg::PointStamped& p2);

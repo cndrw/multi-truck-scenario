@@ -28,23 +28,25 @@ config_file_path = config_file_path.resolve()
 def generate_launch_description():
     
     static_map = [
-        100, 0, 0, 100,  # Black, Grey, Grey, Black
-        0, 0, 0, 0,        # Grey, Grey, Grey, Grey
-        0, 0, 0, 0,        # Grey, Grey, Grey, Grey
-        100, 0, 0, 100   # Black, Grey, Grey, Black
+        100, 100, 0, 100, 100, #0/0, 0/1, ... here as Matrix in RVIZ 0/0 is bottom left
+        0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0,
+        100, 100, 100, 100, 100
     ]
 
+    # Hardcoded width and height for the map
     grid_values = {
         'height': 4,
-        'width': 4,
+        'width': 5,
         'color_map': static_map
     }
 
+
     vehicles = [
-        {'name': 'vehicle_1', 'vin': 1, 'engine': 0, 'speed': 0.0, 'indicator': 0, 'position_x': 2.0, 'position_y': 0.0, 'position_z': 0.0, 'direction_angle': 90.0},
-        {'name': 'vehicle_2', 'vin': 2, 'engine': 0, 'speed': 0.0, 'indicator': 0, 'position_x': 3.0, 'position_y': 2.0, 'position_z': 0.0, 'direction_angle': 180.0}, 
-        {'name': 'vehicle_3', 'vin': 3, 'engine': 0, 'speed': 0.0, 'indicator': 0, 'position_x': 0.0, 'position_y': 1.0, 'position_z': 0.0, 'direction_angle': 0.0},
-        {'name': 'vehicle_4', 'vin': 4, 'engine': 0, 'speed': 0.0, 'indicator': 0, 'position_x': 1.0, 'position_y': 3.0, 'position_z': 0.0, 'direction_angle': 270.0}
+        {'name': 'vehicle_1', 'vin': 1, 'engine': 0, 'speed': 0.0, 'indicator': 1, 'position_x': 2.0, 'position_y': 0.0, 'position_z': 0.0, 'direction_angle': 90.0},
+        {'name': 'vehicle_2', 'vin': 2, 'engine': 0, 'speed': 0.0, 'indicator': 1, 'position_x': 3.0, 'position_y': 2.0, 'position_z': 0.0, 'direction_angle': 180.0}, 
+        #{'name': 'vehicle_3', 'vin': 3, 'engine': 0, 'speed': 0.0, 'indicator': 0, 'position_x': 0.0, 'position_y': 1.0, 'position_z': 0.0, 'direction_angle': 0.0},
+        #{'name': 'vehicle_4', 'vin': 4, 'engine': 0, 'speed': 0.0, 'indicator': 0, 'position_x': 1.0, 'position_y': 3.0, 'position_z': 0.0, 'direction_angle': 270.0}
         # Add more vehicles as needed
     ]
 
