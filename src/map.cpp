@@ -8,6 +8,7 @@
 #include "multi_truck_scenario/msg/vehicle_base_data.hpp"
 #include "multi_truck_scenario/msg/s2_solution.hpp"
 #include "geometry_msgs/msg/point.hpp"
+#include "visualization_msgs/msg/marker.hpp"
 
 using namespace std::chrono_literals;
 namespace mts_msgs = multi_truck_scenario::msg;
@@ -42,6 +43,7 @@ class Map : public rclcpp::Node
 
 
       m_grid_pub = this->create_publisher<nav_msgs::msg::OccupancyGrid>("map_data", 10);
+      m_cube_pub = this->create_publisher<visualization_msgs::msg::Marker>("cube_dta", 10);
       m_timer = this->create_wall_timer(
         send_frequenzy, std::bind(&Map::timer_callback, this)
       );
@@ -56,8 +58,23 @@ class Map : public rclcpp::Node
     }
 
   private:
+    void draw_car()
+    {
+      auto cube = visualization_msgs::msg::Marker();
+      cube.header.stamp = rclcpp::Clock().now();
+      cube.header.frame_id = "map_frame";
+      cube.action = visualization_msgs::msg::Marker::ADD;
+      cube.type = visualization_msgs::msg::Marker::CUBE;
+      cube.ns = "cube";
+      cube.scale.x = 1.0;
+      cube.scale.y = 1.0;
+      cube.color.a = 1.0;
+      cube.scale.z = 1.0;
+      m_cube_pub->publish(cube);
+    } 
     void timer_callback()
     {
+      draw_car();
       auto grid = nav_msgs::msg::OccupancyGrid();
       grid.info.height = m_height;
       grid.info.width = m_width;
@@ -158,6 +175,8 @@ class Map : public rclcpp::Node
     rclcpp::Publisher<nav_msgs::msg::OccupancyGrid>::SharedPtr m_grid_pub;
     rclcpp::Subscription<mts_msgs::VehicleBaseData>::SharedPtr m_vehicle_sub;
     rclcpp::Subscription<mts_msgs::S2Solution>::SharedPtr m_s2_solution_sub;
+
+    rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr m_cube_pub;
 };
 
 int main(int argc, char * argv[])
