@@ -1,62 +1,41 @@
 import launch
 from launch import LaunchDescription
 from launch_ros.actions import Node
-import random
-
-## make sure to choose one option of the following, don't forget the map node
-## --------------------------------------------------------------------------------
-## os option - older and less intuitive
-# import os
-# workspace_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
-# config_file_path = os.path.join(workspace_dir, 'config', 'config_1.rviz')
-
-## --------------------------------------------------------------------------------
-## Pathlib option - more modern and recommended
+from launch.substitutions import LaunchConfiguration
 from pathlib import Path
-workspace_dir = Path(__file__).resolve().parent.parent
-config_file_path = workspace_dir / 'config' / 'config_1.rviz'
-config_file_path = config_file_path.resolve()
-## --------------------------------------------------------------------------------
-# import the image2grid script and execute it for the map node
-#from script.image2grid_converter import generate_cpp_grid_from_image
-# specify path of image using Pathlib
-#scenario_S2_map_path = workspace_dir / 'script' / 'painting_10x10_6_colors.png'
-# convert image to grid data - see below for the implementation of the parameters
-#grid_values = generate_cpp_grid_from_image(scenario_S2_map_path)
-## --------------------------------------------------------------------------------
+import random
+import sys
 
+# Add the script directory to the Python path
+script_dir = Path(__file__).resolve().parent.parent / 'script'
+sys.path.insert(0, str(script_dir))
+
+# Import the function that generates the RViz-compatible grid data
+from image2grid_converter import generate_rviz_static_map
+
+# Define the function for launching the nodes
 def generate_launch_description():
+
+    # Define image path using Pathlib
+    image_path = script_dir / 'painting_10x10_6_colors.png'
     
-    static_map = [
-        100, 100, 0, 100, 100, #0/0, 0/1, ... here as Matrix in RVIZ 0/0 is bottom left
-        0, 0, 0, 0, 0,
-        0, 0, 0, 0, 0,
-        100, 100, 100, 100, 100
-    ]
+    # Generate static map using the function from image_converter.py
+    result = generate_rviz_static_map(str(image_path))
+    static_map = result['static_map']
+    width = result['width']
+    height = result['height']
+    
+    # Print the generated static map and dimensions (for debugging purposes)
+    print("Generated Static Map:", static_map)
+    print(f"Map Width: {width}, Map Height: {height}")
 
-    # Hardcoded width and height for the map
-    grid_values = {
-        'height': 4,
-        'width': 5,
-        'color_map': static_map
-    }
-
-
+    # Example vehicle setup (can be expanded)
     vehicles = [
         {'name': 'vehicle_1', 'vin': 1, 'engine': 0, 'speed': 0.0, 'indicator': 1, 'position_x': 2.0, 'position_y': 0.0, 'position_z': 0.0, 'direction_angle': 90.0},
-        {'name': 'vehicle_2', 'vin': 2, 'engine': 0, 'speed': 0.0, 'indicator': 1, 'position_x': 3.0, 'position_y': 2.0, 'position_z': 0.0, 'direction_angle': 180.0}, 
-        #{'name': 'vehicle_3', 'vin': 3, 'engine': 0, 'speed': 0.0, 'indicator': 0, 'position_x': 0.0, 'position_y': 1.0, 'position_z': 0.0, 'direction_angle': 0.0},
-        #{'name': 'vehicle_4', 'vin': 4, 'engine': 0, 'speed': 0.0, 'indicator': 0, 'position_x': 1.0, 'position_y': 3.0, 'position_z': 0.0, 'direction_angle': 270.0}
-        # Add more vehicles as needed
+        {'name': 'vehicle_2', 'vin': 2, 'engine': 0, 'speed': 0.0, 'indicator': 1, 'position_x': 3.0, 'position_y': 2.0, 'position_z': 0.0, 'direction_angle': 180.0},
     ]
 
-    dir_offset = 5 # offset in degrees
-    offset_val_list = [random.uniform(-dir_offset, dir_offset) for i in range(len(vehicles))] # random offset values
-
-    # add small offset to each angle
-    # for i, v in enumerate(vehicles):
-        # v['direction_angle'] += offset_val_list[i]
-
+    # Vehicle nodes
     vehicle_nodes = []
     for vehicle in vehicles:
         vehicle_nodes.append(
@@ -66,7 +45,7 @@ def generate_launch_description():
                 name=vehicle['name'],
                 parameters=[{
                     'vin': vehicle['vin'],
-                    'engine_state' : vehicle['engine'],
+                    'engine_state': vehicle['engine'],
                     'speed': vehicle['speed'],
                     'indicator_state': vehicle['indicator'],
                     'position_x': vehicle['position_x'],
@@ -78,27 +57,27 @@ def generate_launch_description():
             )
         )
 
+    # Return launch description with nodes
     return LaunchDescription(
         vehicle_nodes + [
-        Node(
-            package='multi_truck_scenario',
-            executable='map_node',
-            name='map_simulation',
-            ## add parameter for grid data
-            ## parameters not yet implemented in map.cpp
-            parameters=[{
-                 'height': grid_values['height'],
-                 'width': grid_values['width'],
-                 'static_map': grid_values['color_map'],
-            }],
-        ),
-        # launch rviz2 for 
-        Node(
-            package='rviz2',
-            executable='rviz2',
-            name='rviz2',
-            output='screen',
-            arguments = ['-d', str(config_file_path)],  # Pathlib option - type casting is needed
-            # arguments = ['-d', config_file_path],  # os option
-        )
-    ])
+            # Launch the map node with the static_map and its dimensions
+            Node(
+                package='multi_truck_scenario',
+                executable='map_node',
+                name='map_simulation',
+                parameters=[{
+                    'height': LaunchConfiguration('height', default=str(height)),  # Convert height to string
+                    'width': LaunchConfiguration('width', default=str(width)),    # Convert width to string
+                    'static_map': LaunchConfiguration('static_map', default=str(static_map)),  # Convert static_map to string
+                }],
+            ),
+            # Launch RViz with the provided config
+            Node(
+                package='rviz2',
+                executable='rviz2',
+                name='rviz2',
+                output='screen',
+                arguments=['-d', str(script_dir.parent / 'config' / 'config_1.rviz')],  # Path to RViz config file
+            )
+        ]
+    )

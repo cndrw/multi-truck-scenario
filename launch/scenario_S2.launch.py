@@ -2,41 +2,33 @@ import launch
 from launch import LaunchDescription
 from launch_ros.actions import Node
 import random
-
-## make sure to choose one option of the following, don't forget the map node
-## --------------------------------------------------------------------------------
-## os option - older and less intuitive
-# import os
-# workspace_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
-# config_file_path = os.path.join(workspace_dir, 'config', 'config_1.rviz')
-
-## --------------------------------------------------------------------------------
-## Pathlib option - more modern and recommended
+import sys
 from pathlib import Path
-workspace_dir = Path(__file__).resolve().parent.parent
-config_file_path = workspace_dir / 'config' / 'config_1.rviz'
-config_file_path = config_file_path.resolve()
-## --------------------------------------------------------------------------------
-# import the image2grid script and execute it for the map node
-#from script.image2grid_converter import generate_cpp_grid_from_image
-# specify path of image using Pathlib
-#scenario_S2_map_path = workspace_dir / 'script' / 'painting_10x10_6_colors.png'
-# convert image to grid data - see below for the implementation of the parameters
-#grid_values = generate_cpp_grid_from_image(scenario_S2_map_path)
-## --------------------------------------------------------------------------------
+
+# Add the 'script' directory to the Python path so that we can import our function
+script_dir = Path(__file__).resolve().parent.parent / 'script'
+sys.path.insert(0, str(script_dir))
+
+# Import the function from the image2grid_converter module
+from image2grid_converter import generate_cpp_grid_from_image
 
 def generate_launch_description():
     
-    static_map = [
-        100, 0, 0, 100,  # Black, Grey, Grey, Black 
-        0, 0, 0, 0,        # Grey, Grey, Grey, Grey
-        0, 0, 0, 0,        # Grey, Grey, Grey, Grey
-        100, 0, 0, 100   # Black, Grey, Grey, Black
-    ]
+    image_path = script_dir / 'scenario_S2.png'
+    
+    # Generate C++ grid data and dimensions
+    grid_data_info = generate_cpp_grid_from_image(str(image_path))
+    static_map = grid_data_info['cpp_grid_data']
+    width = grid_data_info['width']
+    height = grid_data_info['height']
+
+    # Print the data (for debugging)
+    print("C++ Grid Data:\n", static_map)
+    print(f"Image Dimensions: Width={width}, Height={height}")
 
     grid_values = {
-        'height': 4,
-        'width': 4,
+        'height': height,
+        'width': width,
         'color_map': static_map
     }
 
@@ -45,15 +37,10 @@ def generate_launch_description():
         {'name': 'vehicle_2', 'vin': 2, 'engine': 0, 'speed': 0.0, 'indicator': 0, 'position_x': 3.0, 'position_y': 2.0, 'position_z': 0.0, 'direction_angle': 180.0}, 
         {'name': 'vehicle_3', 'vin': 3, 'engine': 0, 'speed': 0.0, 'indicator': 0, 'position_x': 0.0, 'position_y': 1.0, 'position_z': 0.0, 'direction_angle': 0.0},
         {'name': 'vehicle_4', 'vin': 4, 'engine': 0, 'speed': 0.0, 'indicator': 0, 'position_x': 1.0, 'position_y': 3.0, 'position_z': 0.0, 'direction_angle': 270.0}
-        # Add more vehicles as needed
     ]
 
     dir_offset = 5 # offset in degrees
     offset_val_list = [random.uniform(-dir_offset, dir_offset) for i in range(len(vehicles))] # random offset values
-
-    # add small offset to each angle
-    # for i, v in enumerate(vehicles):
-        # v['direction_angle'] += offset_val_list[i]
 
     vehicle_nodes = []
     for vehicle in vehicles:
@@ -83,7 +70,6 @@ def generate_launch_description():
             executable='map_node',
             name='map_simulation',
             ## add parameter for grid data
-            ## parameters not yet implemented in map.cpp
             parameters=[{
                  'height': grid_values['height'],
                  'width': grid_values['width'],
@@ -97,6 +83,5 @@ def generate_launch_description():
             name='rviz2',
             output='screen',
             arguments = ['-d', str(config_file_path)],  # Pathlib option - type casting is needed
-            # arguments = ['-d', config_file_path],  # os option
         )
     ])
