@@ -177,7 +177,7 @@ private:
                 if (solution != nullptr)
                 {
                     auto solution_msg = mts_msgs::S2Solution();
-                    solution_msg.author_vin = solution->author_vin;
+                    solution_msg.author_vin = m_vin;
                     solution_msg.winner_vin = solution->winner_vin;
                     m_solution_pub->publish(solution_msg);
                 }

@@ -33,7 +33,7 @@ std::unique_ptr<SolutionType> ScenarioSolver::solve(Scenario scenario, const std
             break;
 
         default:
-            std::cerr << "ERROR: Scenario solution not implemented yet\n"; 
+            RCLCPP_ERROR(m_logger, "Scenario solution not implemented yet");
             break;
     }
 
@@ -53,19 +53,18 @@ ScenarioSolver::ScenarioSolver() : m_logger(rclcpp::get_logger("solver"))
 
 void ScenarioSolver::solve_s1()
 {
-    // get the car that would have had right to drive
-    int priority_car_vin = solve_uncontrolled_intersection(PriorityRule::right);
+    // get the vehicle that would have had right to drive
+    int priority_car_vin = solve_uncontrolled_intersection();
 
-    /* 
-    const auto priority_car = std::find_if(m_vehicles.begin(), m_vehicles.end(), [priority_car_vin](const auto& v){
+    // get vehicle data from vin
+    const auto vehicle = *std::find_if(m_vehicles.begin(), m_vehicles.end(), [priority_car_vin](const auto& v){
         return v->vin == priority_car_vin;
     });
-    */
 
-   int upgraded_priority_car = get_vehicle_left(priority_car_vin);
-   RCLCPP_INFO(m_logger, "winner %d", upgraded_priority_car);
-   m_solution.author_vin = m_owner_vin;
-   m_solution.winner_vin = upgraded_priority_car;
+    int upgraded_priority_car = get_vehicle(vehicle, Side::left);
+
+    m_solution.author_vin = m_owner_vin;
+    m_solution.winner_vin = upgraded_priority_car;
 }
 
 void ScenarioSolver::solve_s2()
@@ -76,20 +75,16 @@ void ScenarioSolver::solve_s2()
     }
     else
     {
-        const int winner = solve_uncontrolled_intersection(PriorityRule::right);
+        const int winner = solve_uncontrolled_intersection();
         m_solution.winner_vin = winner;
     }
 }
 
-int ScenarioSolver::get_vehicle_left(const int vin)
+int ScenarioSolver::get_vehicle(const mts_msgs::VehicleBaseData::SharedPtr vehicle, Side side)
 {
-    const auto vehicle = std::find_if(m_vehicles.begin(), m_vehicles.end(), [vin](const auto& v){
-        return v->vin == vin;
-    })[0];
-
-    const auto adjust_angle = 90 - vehicle->direction;
-    const auto adjusted_v1_angle = vehicle->direction + adjust_angle; 
     int winner_vin = INVALID_VIN;
+    constexpr auto reference_angle = 90.0;
+    const auto adjust_angle = reference_angle - vehicle->direction;
 
     for (const auto& other : m_vehicles)
     {
@@ -113,13 +108,26 @@ int ScenarioSolver::get_vehicle_left(const int vin)
             diff_angle += 360;
         }
 
-        if (diff_angle >= adjusted_v1_angle)
+        if (diff_angle >= 360)
+        {
+            diff_angle -= 360;
+        }
+
+        // determine on which side it is
+        bool result = diff_angle <= reference_angle;
+        if (side == Side::left)
+        {
+            result = !result;
+        }
+
+        if (result)
         {
             winner_vin = other->vin;
         }
     }
 
     return winner_vin;
+
 }
 
 bool ScenarioSolver::is_opposite(float alpha, float beta) const
@@ -127,76 +135,17 @@ bool ScenarioSolver::is_opposite(float alpha, float beta) const
     return std::abs(std::abs(alpha - beta) - 180) < 10;
 }
 
-int ScenarioSolver::get_vehicle_right(const int vin)
+int ScenarioSolver::solve_uncontrolled_intersection()
 {
-
-}
-
-int ScenarioSolver::solve_uncontrolled_intersection(PriorityRule rule)
-{
-    int winner_vin = INVALID_VIN; // TODO: should actually no be ignored if that comes throu
-    for (const auto& v1 : m_vehicles)
+    for (const auto& vehicle: m_vehicles)
     {
-        size_t count = 0;
-        // get the adjustment value so that v1.direction - adjustment_value equals 90
-        const auto adjust_angle = 90 - v1->direction;
-        const auto adjusted_v1_angle = v1->direction + adjust_angle; 
-
-        for (const auto& v2 : m_vehicles)
+        if (get_vehicle(vehicle, Side::right) == INVALID_VIN)
         {
-            if (v1 == v2) continue;
-
-            // get direction vector from v1 to v2
-            const auto diff = substract(v1->position, v2->position);
-            
-            // angle of the direction vector
-            auto diff_angle = std::atan2(diff.point.y, diff.point.x) * RAD2DEG;
-
-            diff_angle += adjust_angle; // also adjust the angle of the differenz vector
-
-            if (diff_angle < 0)
-            {
-                diff_angle += 360;
-            }
-
-            // test if vehicles are opposite
-            // RCLCPP_INFO(m_logger, "v1: %f, v2: %f, diff %f)", v1->direction, v2->direction, std::abs(v1->direction - v2->direction));
-            if (is_opposite(v1->direction, v2->direction))
-            {
-                count++;
-                RCLCPP_INFO(m_logger, "[%d] car %d +1 (%d)", m_owner_vin, v1->vin, v2->vin);
-                continue;
-            }
-
-            // if differenz angle is creater than the one of the vehicle under test (VUT) -> it is to the left of VUT 
-            bool result = diff_angle <= adjusted_v1_angle;
-            if (rule == PriorityRule::left)
-            {
-                result = !result;
-            }
-
-            // if a vehicle is to the right -> no right to drive
-            if (result)
-            {
-                RCLCPP_INFO(m_logger, "car %d is to the right of %d", v2->vin, v1->vin);
-                break;
-            }
-            else
-            {
-                RCLCPP_INFO(m_logger, "[%d] car %d +1 (%d)", m_owner_vin, v1->vin, v2->vin);
-                count++;
-            }
+            m_solution.author_vin = m_owner_vin;
+            return vehicle->vin;
         }
-
-        // if all cars are not "right" than this one has to drive
-        if (count == m_vehicles.size() - 1)
-        {
-            winner_vin = v1->vin;
-        }
-    } 
-
-    m_solution.author_vin = m_owner_vin;
-    return winner_vin;
+    }
+    return INVALID_VIN;
 }
 
 void ScenarioSolver::pick_random_vehicle()
@@ -212,6 +161,7 @@ void ScenarioSolver::pick_random_vehicle()
 
         m_solution.author_vin = m_owner_vin;
         m_solution.winner_vin = rnd_vin;
+        RCLCPP_INFO(m_logger, "rand winner: %d", rnd_vin);
     }
 }
 

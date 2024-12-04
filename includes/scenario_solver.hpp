@@ -20,7 +20,7 @@ struct SolutionType
     int winner_vin;
 };
 
-enum class PriorityRule
+enum class Side
 {
     right,
     left
@@ -40,9 +40,8 @@ private:
 private:
     void solve_s1();
     void solve_s2();
-    int solve_uncontrolled_intersection(PriorityRule rule);
-    int get_vehicle_right(int vin);
-    int get_vehicle_left(int vin);
+    int solve_uncontrolled_intersection();
+    int get_vehicle(const mts_msgs::VehicleBaseData::SharedPtr vehicle, Side side);
     bool is_opposite(float alpha, float beta) const;
     void pick_random_vehicle();
 
