@@ -2,6 +2,8 @@ import launch
 from launch import LaunchDescription
 from launch_ros.actions import Node
 import random
+from pathlib import Path
+import sys
 
 ## make sure to choose one option of the following, don't forget the map node
 ## --------------------------------------------------------------------------------
@@ -12,33 +14,42 @@ import random
 
 ## --------------------------------------------------------------------------------
 ## Pathlib option - more modern and recommended
-from pathlib import Path
 workspace_dir = Path(__file__).resolve().parent.parent
 config_file_path = workspace_dir / 'config' / 'config_1.rviz'
 config_file_path = config_file_path.resolve()
 ## --------------------------------------------------------------------------------
-# import the image2grid script and execute it for the map node
-#from script.image2grid_converter import generate_cpp_grid_from_image
-# specify path of image using Pathlib
-#scenario_S2_map_path = workspace_dir / 'script' / 'painting_10x10_6_colors.png'
-# convert image to grid data - see below for the implementation of the parameters
-#grid_values = generate_cpp_grid_from_image(scenario_S2_map_path)
+## Add the script directory to the Python path
+script_dir = Path(__file__).resolve().parent.parent / 'script'
+sys.path.insert(0, str(script_dir))
+# Import the function that generates the RViz-compatible grid data
+from image2grid_converter import generate_rviz_static_map
 ## --------------------------------------------------------------------------------
 
 def generate_launch_description():
     
-    static_map = [
-        100, 0, 0, 100,  # Black, Grey, Grey, Black 
-        0, 0, 0, 0,        # Grey, Grey, Grey, Grey
-        0, 0, 0, 0,        # Grey, Grey, Grey, Grey
-        100, 0, 0, 100   # Black, Grey, Grey, Black
-    ]
+    # Define image path using Pathlib
+    image_path = script_dir / 'scenario_S2.png'
+    
+    # Generate static map using the function from image_converter.py
+    result = generate_rviz_static_map(str(image_path))
+    # static_map = result['static_map']
+    # width = result['width']
+    # height = result['height']
+    
+    # static_map = [
+    #     100, 0, 0, 100,  # Black, Grey, Grey, Black 
+    #     0, 0, 0, 0,        # Grey, Grey, Grey, Grey
+    #     0, 0, 0, 0,        # Grey, Grey, Grey, Grey
+    #     100, 0, 0, 100   # Black, Grey, Grey, Black
+    # ]
 
-    grid_values = {
-        'height': 4,
-        'width': 4,
-        'color_map': static_map
-    }
+    # extract grid values from result
+    # grid_values = {
+    #     'height': result['height'],
+    #     'width': result['width'],
+    #     'static_map': result['static_map']
+    # }
+
 
     vehicles = [
         {'name': 'vehicle_1', 'vin': 1, 'engine': 0, 'speed': 0.0, 'indicator': 0, 'position_x': 2.0, 'position_y': 0.0, 'position_z': 0.0, 'direction_angle': 90.0},
@@ -85,9 +96,9 @@ def generate_launch_description():
             ## add parameter for grid data
             ## parameters not yet implemented in map.cpp
             parameters=[{
-                 'height': grid_values['height'],
-                 'width': grid_values['width'],
-                 'static_map': grid_values['color_map'],
+                 'height': result['height'],
+                 'width': result['width'],
+                 'static_map': result['static_map'],
             }],
         ),
         # launch rviz2 for 
