@@ -5,12 +5,32 @@ Repository for the C2C Communication of the ZF-Trucks at the lab of DHBW Friedri
 By Bandik Nickel, Conrad Walther & Toni Stöcker
 
 
-todo:
+## Todo:
 - autos erkennen dass sie an einer kreuzung (setzten wir vorraus)
 - auto finden die relevanten autos in dem szenario
 - lösen des szenarios -> vergleich der winkel -> auto finden dass rechts frei -> fährt (wird grün in rviz)
 - alle senden die vin des autos welches fahren soll -> kontrolle
 
-weitere sachen:
+## Weitere Sachen:
 - aufnahme der daten der anderen fahrzeuge (wann?)
 - detektion von Fahrzeuge die von einer kreuzung weg fahren
+
+## Schreiben todo:
+- simulationsbums (toni)
+  - launch files
+  - wie wir unsere simulationen aufbauen (möglichkeiten)
+
+- technische Lösung der Szenarien (detailliert)
+- implementation (klassenaufbau, flowcharts)
+  
+- restlichen Szenarien beschreiben
+  - Conrad bilder
+  - Bandik text
+ 
+- scneario detektierung v2 (conrad)
+
+- zusammenfassung (???)
+- ausblick (???)
+- abstract (???)
+
+  
