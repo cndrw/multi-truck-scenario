@@ -29,8 +29,8 @@ By Bandik Nickel, Conrad Walther & Toni Stöcker
  
 - scneario detektierung v2 (conrad)
 
-- zusammenfassung (Bandik)
-- ausblick (???)
-- abstract (???)
+- zusammenfassung (Bandik --> rudimentär vorgeschrieben) $\checkmark$ 
+- ausblick (Bandik --> rudimentär vorgeschrieben) $\checkmark$
+- abstract (Bandik --> rudimentär vorgeschrieben) $\checkmark$
 
   
