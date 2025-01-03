@@ -25,11 +25,11 @@ By Bandik Nickel, Conrad Walther & Toni Stöcker
   
 - restlichen Szenarien beschreiben
   - Conrad bilder $\checkmark$
-  - Bandik text
+  - Bandik text    $\checkmark$
  
 - scneario detektierung v2 (conrad)
 
-- zusammenfassung (???)
+- zusammenfassung (Bandik)
 - ausblick (???)
 - abstract (???)
 
