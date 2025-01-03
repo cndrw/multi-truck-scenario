@@ -23,7 +23,7 @@ By Bandik Nickel, Conrad Walther & Toni Stöcker
 - technische Lösung der Szenarien (detailliert)
 - implementation (klassenaufbau, flowcharts)
   
-- restlichen Szenarien beschreiben
+- restlichen Szenarien beschreiben $\checkmark$
   - Conrad bilder $\checkmark$
   - Bandik text    $\checkmark$
  
