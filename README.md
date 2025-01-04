@@ -21,7 +21,7 @@ By Bandik Nickel, Conrad Walther & Toni Stöcker
   - wie wir unsere simulationen aufbauen (möglichkeiten)
 
 - technische Lösung der Szenarien (detailliert)
-- implementation (klassenaufbau, flowcharts)
+- implementation (klassenaufbau, flowcharts) (Conrad --> polish fehlt noch) $\checkmark$
   
 - restlichen Szenarien beschreiben $\checkmark$
   - Conrad bilder $\checkmark$
