@@ -20,7 +20,7 @@ By Bandik Nickel, Conrad Walther & Toni Stöcker
   - launch files
   - wie wir unsere simulationen aufbauen (möglichkeiten)
 
-- technische Lösung der Szenarien (detailliert) (Conrad)
+- technische Lösung der Szenarien (detailliert) (Conrad) $\checkmark$
 - implementation (klassenaufbau, flowcharts) (Conrad --> polish fehlt noch) $\checkmark$
   
 - restlichen Szenarien beschreiben $\checkmark$
