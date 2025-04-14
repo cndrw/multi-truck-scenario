@@ -28,8 +28,13 @@ set(msg_files
   "msg/S2Solution.msg"
 )
 
+set(srv_files
+  "srv/GetEventSiteDistance.srv"
+)
+
 rosidl_generate_interfaces(${PROJECT_NAME}
   ${msg_files}
+  ${srv_files}
   DEPENDENCIES geometry_msgs std_msgs
 )
 

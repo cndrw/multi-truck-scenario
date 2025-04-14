@@ -32,6 +32,9 @@ public:
     {
         handle_parameters();
         m_scenario_solver.set_owner(m_vin);
+        m_scenario_detector.set_implemenation(1);
+        m_scenario_detector.check();
+        return;
 
         // Publisher der die Daten der Instanz veröffentlicht
         m_vehicle_pub = this->create_publisher<mts_msgs::VehicleBaseData>("vehicle_base_data", 10);
@@ -279,6 +282,7 @@ private:
         std::vector<int> m_solution_vins;
 
         ScenarioSolver m_scenario_solver;
+        ScenarioDetector m_scenario_detector;
 
         // temp
         size_t m_count = 4;
