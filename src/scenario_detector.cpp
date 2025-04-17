@@ -1,12 +1,18 @@
+#include <iostream>
+#include <vector>
+
 #include "scenario_detector.hpp"
 #include "rclcpp/rclcpp.hpp"
+#include "geometry_msgs/msg/point_stamped.hpp"
+
 #include "multi_truck_scenario/msg/vehicle_base_data.hpp"
 #include "multi_truck_scenario/srv/get_event_site_distance.hpp"
-#include <iostream>
+#include "tutils.h"
 
 using namespace std::chrono_literals;
 namespace mts_msgs = multi_truck_scenario::msg;
 namespace mts_srvs = multi_truck_scenario::srv;
+
 
 void ScenarioDetector::set_implemenation(const int impl)
 {
@@ -15,35 +21,60 @@ void ScenarioDetector::set_implemenation(const int impl)
 
 ScenarioDetector::ScenarioDetector()
 {
-    impl[0] = std::bind(&ScenarioDetector::check_1, this);
-    impl[1] = std::bind(&ScenarioDetector::check_2, this);
+    impl[0] = std::bind(&ScenarioDetector::check_1, this, std::placeholders::_1);
+    impl[1] = std::bind(&ScenarioDetector::check_2, this, std::placeholders::_1);
 }
 
-Scenario ScenarioDetector::check()
+Scenario ScenarioDetector::check(const std::vector<mts_msgs::VehicleBaseData>& vehicles)
 {
-    return impl[m_implementation]();
+    return impl[m_implementation](vehicles);
 }
 
-Scenario ScenarioDetector::check_1()
+Scenario ScenarioDetector::check_1(const std::vector<mts_msgs::VehicleBaseData>& vehicles)
 {
     return Scenario();
 }
 
-Scenario ScenarioDetector::check_2()
+Scenario ScenarioDetector::check_2(const std::vector<mts_msgs::VehicleBaseData>& vehicles)
 {
-    auto vehicle = mts_msgs::VehicleBaseData();
-    vehicle.speed = 5;
-    vehicle.position.point.x = 0;
-    vehicle.position.point.y = 0;
+    std::vector<mts_msgs::VehicleBaseData>  invoveld_vehicles;
 
-    // service von map -> get_closest_(ereignisstelle)
-    // calculate distance from vehicle to (ereignisstelle)
+    for (auto& vehicle : vehicles)
+    {
+        // service von map -> get_closest_(ereignisstelle)
+        // calculate distance from vehicle to (ereignisstelle)
 
-    FValue velocity = velocity_fuzzy_func(vehicle.speed); 
-    FValue distance = distance_fuzzy_func(get_distance_event_site(vehicle));
+        FValue velocity = velocity_fuzzy_func(vehicle.speed); 
+        FValue distance = distance_fuzzy_func(get_distance_event_site(vehicle.position));
+
+        // d(r) <= d(r + a)
+        auto dir = geometry_msgs::msg::PointStamped();
+        dir.point.x = std::cos(vehicle.direction);
+        dir.point.y = std::sin(vehicle.direction);
+
+        if (
+            get_distance_event_site(vehicle.position) <
+            get_distance_event_site(tutils::add(vehicle.position, dir)))
+        {
+            invoveld_vehicles.push_back(vehicle);
+        }
+    }
+
+    for (const auto& vehicle : invoveld_vehicles)
+    {
+        FValue involvement = 
+        {
+            .first = 0.8, // involved
+            .second = 0.2, // not involved
+            .third = 0
+        }; 
+    }
+
+    // apply fuzzy rules to involveed_vehicles (according to their involvement B)
 
     return Scenario();
 }
+
 
 FValue ScenarioDetector::velocity_fuzzy_func(float velocity)
 {
@@ -175,14 +206,14 @@ float ScenarioDetector::distance_far(float distance)
     }
 }
 
-float ScenarioDetector::get_distance_event_site(const mts_msgs::VehicleBaseData& vehicle)
+float ScenarioDetector::get_distance_event_site(const geometry_msgs::msg::PointStamped& position) const
 {
     std::shared_ptr<rclcpp::Node> node = rclcpp::Node::make_shared("map_requester");
     rclcpp::Client<mts_srvs::GetEventSiteDistance>::SharedPtr client =
         node->create_client<mts_srvs::GetEventSiteDistance>("get_event_site_distance");
 
     auto request = std::make_shared<mts_srvs::GetEventSiteDistance::Request>();
-    request->position = vehicle.position;
+    request->position = position;
 
     while (!client->wait_for_service(1s))
     {

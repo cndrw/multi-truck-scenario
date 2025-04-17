@@ -4,6 +4,7 @@
 
 #include "scenario_solver.hpp"
 #include "rclcpp/rclcpp.hpp"
+#include "tutils.h"
 
 static constexpr uint8_t S2_MAX_VEHICLES { 4 };
 static constexpr auto RAD2DEG { 180 / M_PI };
@@ -84,7 +85,7 @@ void ScenarioSolver::solve_right_of_way()
         {
             if (v1 == v2) continue;
 
-            const auto diff = substract(v1->position, v2->position);
+            const auto diff = tutils::substract(v1->position, v2->position);
             
             auto diff_angle = std::atan2(diff.point.y, diff.point.x) * RAD2DEG;
             diff_angle += adjust_angle; // also adjust the angle of the differenz vector
@@ -111,13 +112,3 @@ void ScenarioSolver::solve_right_of_way()
     m_solution.winner_vin = winner_vin;
 }
 
-geometry_msgs::msg::PointStamped ScenarioSolver::substract(
-    const geometry_msgs::msg::PointStamped& p1,
-    const geometry_msgs::msg::PointStamped& p2
-)
-{
-    auto tmp = geometry_msgs::msg::PointStamped();
-    tmp.point.x = p2.point.x - p1.point.x;
-    tmp.point.y = p2.point.y - p1.point.y;
-    return tmp;
-}

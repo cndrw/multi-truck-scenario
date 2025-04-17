@@ -30,9 +30,6 @@ private:
     void pick_random_vehicle();
     void solve_right_of_way();
 
-    // geometry util functions
-    geometry_msgs::msg::PointStamped substract(const geometry_msgs::msg::PointStamped& p1, const geometry_msgs::msg::PointStamped& p2);
-
     std::vector<mts_msgs::VehicleBaseData::SharedPtr> m_vehicles;
     SolutionType m_solution;
     int m_owner_vin;

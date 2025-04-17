@@ -33,7 +33,7 @@ public:
         handle_parameters();
         m_scenario_solver.set_owner(m_vin);
         m_scenario_detector.set_implemenation(1);
-        m_scenario_detector.check();
+        m_scenario_detector.check(std::vector<mts_msgs::VehicleBaseData> { mts_msgs::VehicleBaseData() });
         return;
 
         // Publisher der die Daten der Instanz veröffentlicht
