@@ -43,15 +43,12 @@ public:
             "vehicle_base_data", 10, std::bind(&Vehicle::vehicle_position_callback, this, std::placeholders::_1)
         );
 
-        m_solution_sub = this->create_subscription<mts_msgs::S2Solution>(
-        m_solution_sub = this->create_subscription<mts_msgs::S2Solution>(
+         m_solution_sub = this->create_subscription<mts_msgs::S2Solution>(
             "s2_solution", 10, std::bind(&Vehicle::s2_solution_callback, this, std::placeholders::_1)
         );
 
-        // Timer, der die Position alle 100 ms veröffentlicht
-        // Timer, der die Position alle 100 ms veröffentlicht
         m_timer = this->create_wall_timer(
-            500ms, std::bind(&Vehicle::publish_vehicle, this)
+            500ms, std::bind(&Vehicle::update, this)
         );
     }
     ~Vehicle() {}
@@ -287,7 +284,8 @@ private:
     const auto key = vehicle_data->vin;
     if (m_vehicles.count(key) == 0) 
     {
-        m_vehicles.emplace(key, vehicle_data);
+       
+Auto-merging src/vehicle.cpp m_vehicles.emplace(key, vehicle_data);
         std::cout << (m_vehicles[key]->vin) << std::endl;
         if (m_vehicles.size() == 3)
         {
