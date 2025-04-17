@@ -51,6 +51,7 @@ public:
             500ms, std::bind(&Vehicle::update, this)
         );
     }
+    ~Vehicle() {}
 
     bool is_active()
     {

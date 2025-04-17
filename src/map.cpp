@@ -8,6 +8,7 @@
 #include "multi_truck_scenario/msg/vehicle_base_data.hpp"
 #include "multi_truck_scenario/msg/s2_solution.hpp"
 #include "geometry_msgs/msg/point.hpp"
+#include "visualization_msgs/msg/marker.hpp"
 
 using namespace std::chrono_literals;
 namespace mts_msgs = multi_truck_scenario::msg;
@@ -42,6 +43,7 @@ class Map : public rclcpp::Node
 
 
       m_grid_pub = this->create_publisher<nav_msgs::msg::OccupancyGrid>("map_data", 10);
+      m_cube_pub = this->create_publisher<visualization_msgs::msg::Marker>("cube_dta", 10);
       m_timer = this->create_wall_timer(
         send_frequenzy, std::bind(&Map::timer_callback, this)
       );
@@ -56,8 +58,27 @@ class Map : public rclcpp::Node
     }
 
   private:
+    void draw_car(float x, float y, int id)
+    {
+      auto cube = visualization_msgs::msg::Marker();
+      cube.header.stamp = rclcpp::Clock().now();
+      cube.header.frame_id = "map_frame";
+      cube.action = visualization_msgs::msg::Marker::ADD;
+      cube.type = visualization_msgs::msg::Marker::CUBE;
+      cube.ns = std::to_string(id);
+      cube.pose.position.x = 0.5 + x;
+      cube.pose.position.y = 0.5 + y;
+      cube.pose.position.z = 0.5;
+      cube.color = m_car_visuals[id];
+      cube.scale.x = 1.0;
+      cube.scale.y = 1.0;
+      cube.color.a = 1.0;
+      cube.scale.z = 1.0;
+      m_cube_pub->publish(cube);
+    }
     void timer_callback()
     {
+
       auto grid = nav_msgs::msg::OccupancyGrid();
       grid.info.height = m_height;
       grid.info.width = m_width;
@@ -84,21 +105,27 @@ class Map : public rclcpp::Node
 
     void vehicle_position_callback(const mts_msgs::VehicleBaseData::SharedPtr vehicle_data)
     {
-        if (is_out_of_bound(vehicle_data->position.point))
+/**       if (is_out_of_bound(vehicle_data->position.point))
         {
             return;
-        } 
+        } */
 
         const auto key = vehicle_data->vin;
         if (m_vehicles.count(key) == 0) 
         {
             m_vehicles.emplace(key, vehicle_data);
             m_color_map.emplace(key, Colors::Red);
+            auto c = std_msgs::msg::ColorRGBA();
+            c.r = 1;
+            m_car_visuals.emplace(key, c);
         }
         else 
         {
             m_vehicles[key] = vehicle_data;
         }
+
+        auto pos = vehicle_data->position.point;
+        draw_car(pos.x, pos.y, vehicle_data->vin);
 
         set_vehicle_color(key);
     }
@@ -114,6 +141,10 @@ class Map : public rclcpp::Node
 
         // set the winner green
         m_color_map[vin] = Colors::Green;
+        auto c = m_car_visuals[vin];
+        c.g = 1;
+        c.r = 0;
+        m_car_visuals[vin] = c;
 
         set_vehicle_color(vin);
     }
@@ -155,9 +186,12 @@ class Map : public rclcpp::Node
     std::vector<int8_t> m_static_map;
     std::vector<int8_t> m_grid;
     std::unordered_map<int, int> m_color_map;
+    std::unordered_map<int, std_msgs::msg::ColorRGBA> m_car_visuals;
     rclcpp::Publisher<nav_msgs::msg::OccupancyGrid>::SharedPtr m_grid_pub;
     rclcpp::Subscription<mts_msgs::VehicleBaseData>::SharedPtr m_vehicle_sub;
     rclcpp::Subscription<mts_msgs::S2Solution>::SharedPtr m_s2_solution_sub;
+
+    rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr m_cube_pub;
 };
 
 int main(int argc, char * argv[])
