@@ -33,8 +33,6 @@ public:
         handle_parameters();
         m_scenario_solver.set_owner(m_vin);
         m_scenario_detector.set_implemenation(1);
-        m_scenario_detector.check(std::vector<mts_msgs::VehicleBaseData> { mts_msgs::VehicleBaseData() });
-        return;
 
         // Publisher der die Daten der Instanz veröffentlicht
         m_vehicle_pub = this->create_publisher<mts_msgs::VehicleBaseData>("vehicle_base_data", 10);
@@ -169,14 +167,16 @@ private:
             if (m_vehicles.size() == m_count)
             {
                 // get the list of vehicles from the map
-                std::vector<mts_msgs::VehicleBaseData::SharedPtr> vehicles;
+                std::vector<mts_msgs::VehicleBaseData> vehicles;
                 vehicles.reserve(m_vehicles.size());
                 for (const auto v : m_vehicles)
                 {
-                    vehicles.push_back(v.second);
+                    vehicles.push_back(*v.second);
                 }
 
-                const auto solution = m_scenario_solver.solve(Scenario::S2, vehicles);
+                Scenario scenario = m_scenario_detector.check(vehicles);
+                const auto solution = m_scenario_solver.solve(scenario, vehicles);
+
                 if (solution != nullptr)
                 {
                     auto solution_msg = mts_msgs::S2Solution();
@@ -285,7 +285,7 @@ private:
         ScenarioDetector m_scenario_detector;
 
         // temp
-        size_t m_count = 4;
+        size_t m_count = 2;
         double m_solution_delay;
         double m_delay_time = 2;
 };

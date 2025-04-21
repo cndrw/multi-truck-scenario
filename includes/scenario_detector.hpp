@@ -35,6 +35,7 @@ public:
 private:
     Scenario check_2(const std::vector<mts_msgs::VehicleBaseData>& vehicle); // impl 2 from T3100 
     Scenario check_1(const std::vector<mts_msgs::VehicleBaseData>& vehicle); // impl 2 from T3100
+    std::vector<std::tuple<mts_msgs::VehicleBaseData, FValue>> apply_fuzzy_logic(const std::vector<mts_msgs::VehicleBaseData>&);
     FValue velocity_fuzzy_func(float velocity);
     float velocity_standing(float);
     float velocity_slow(float);
@@ -44,8 +45,10 @@ private:
     float distance_close(float);
     float distance_far(float);
     float get_distance_event_site(const geometry_msgs::msg::PointStamped& position) const;
+    FValue apply_fuzzy_rules(const FValue& speed, const FValue& distance) const;
 
 private:
     int m_implementation = -1;
     std::array<std::function<Scenario(const std::vector<mts_msgs::VehicleBaseData>&)>, 2> impl;
+    rclcpp::Logger m_logger;
 };

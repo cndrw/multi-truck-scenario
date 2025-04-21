@@ -16,7 +16,7 @@ void ScenarioSolver::set_owner(int vin)
     m_solution.author_vin = vin;
 }
 
-std::unique_ptr<SolutionType> ScenarioSolver::solve(Scenario scenario, const std::vector<mts_msgs::VehicleBaseData::SharedPtr>& vehicles)
+std::unique_ptr<SolutionType> ScenarioSolver::solve(Scenario scenario, const std::vector<mts_msgs::VehicleBaseData>& vehicles)
 {
     // reset solution 
     m_solution.winner_vin = INVALID_VIN;
@@ -58,7 +58,7 @@ void ScenarioSolver::solve_s2()
 void ScenarioSolver::pick_random_vehicle()
 {
     bool is_smallest_vin = std::all_of(m_vehicles.begin(), m_vehicles.end(), [this](const auto v){
-        return m_owner_vin <= v->vin;  
+        return m_owner_vin <= v.vin;  
     });
 
     if (is_smallest_vin)
@@ -78,14 +78,14 @@ void ScenarioSolver::solve_right_of_way()
     {
         size_t count = 0;
         // get the adjustment value so that v1.direction - adjustment_value equals 90
-        const auto adjust_angle = 90 - v1->direction;
-        const auto adjusted_v1_angle= v1->direction + adjust_angle; 
+        const auto adjust_angle = 90 - v1.direction;
+        const auto adjusted_v1_angle= v1.direction + adjust_angle; 
 
         for (const auto& v2 : m_vehicles)
         {
             if (v1 == v2) continue;
 
-            const auto diff = tutils::substract(v1->position, v2->position);
+            const auto diff = tutils::substract(v1.position, v2.position);
             
             auto diff_angle = std::atan2(diff.point.y, diff.point.x) * RAD2DEG;
             diff_angle += adjust_angle; // also adjust the angle of the differenz vector
@@ -104,7 +104,7 @@ void ScenarioSolver::solve_right_of_way()
             // if all cars are not "right" than this one has to drive
         if (count == m_vehicles.size() - 1)
         {
-            winner_vin = v1->vin;
+            winner_vin = v1.vin;
         }
     } 
 

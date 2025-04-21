@@ -21,7 +21,7 @@ struct SolutionType
 class ScenarioSolver
 {
 public:
-    std::unique_ptr<SolutionType> solve(Scenario scenario, const std::vector<mts_msgs::VehicleBaseData::SharedPtr>& vehicles);
+    std::unique_ptr<SolutionType> solve(Scenario scenario, const std::vector<mts_msgs::VehicleBaseData>& vehicles);
     void set_owner(int vin);
 
 
@@ -30,7 +30,7 @@ private:
     void pick_random_vehicle();
     void solve_right_of_way();
 
-    std::vector<mts_msgs::VehicleBaseData::SharedPtr> m_vehicles;
+    std::vector<mts_msgs::VehicleBaseData> m_vehicles;
     SolutionType m_solution;
     int m_owner_vin;
 };

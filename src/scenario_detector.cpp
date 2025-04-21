@@ -19,7 +19,7 @@ void ScenarioDetector::set_implemenation(const int impl)
     m_implementation = impl;
 }
 
-ScenarioDetector::ScenarioDetector()
+ScenarioDetector::ScenarioDetector() : m_logger(rclcpp::get_logger("detector"))
 {
     impl[0] = std::bind(&ScenarioDetector::check_1, this, std::placeholders::_1);
     impl[1] = std::bind(&ScenarioDetector::check_2, this, std::placeholders::_1);
@@ -30,49 +30,59 @@ Scenario ScenarioDetector::check(const std::vector<mts_msgs::VehicleBaseData>& v
     return impl[m_implementation](vehicles);
 }
 
-Scenario ScenarioDetector::check_1(const std::vector<mts_msgs::VehicleBaseData>& vehicles)
+Scenario ScenarioDetector::check_1([[maybe_unused]] const std::vector<mts_msgs::VehicleBaseData>& vehicles)
 {
     return Scenario();
+}
+
+std::vector<std::tuple<mts_msgs::VehicleBaseData, FValue>> 
+ScenarioDetector::apply_fuzzy_logic(const std::vector<mts_msgs::VehicleBaseData>& vehicles) 
+{
+    std::vector<std::tuple<mts_msgs::VehicleBaseData, FValue>> fuzzy_vehicles;
+    for (const auto& vehicle : vehicles)
+    {
+        FValue velocity = velocity_fuzzy_func(vehicle.speed); 
+        FValue distance = distance_fuzzy_func(get_distance_event_site(vehicle.position));
+        // apply fuzzy rules to involveed_vehicles (according to their involvement B)
+        FValue involvement = apply_fuzzy_rules(velocity, distance);
+        fuzzy_vehicles.push_back({vehicle, involvement});
+    }
+    return fuzzy_vehicles;
 }
 
 Scenario ScenarioDetector::check_2(const std::vector<mts_msgs::VehicleBaseData>& vehicles)
 {
     std::vector<mts_msgs::VehicleBaseData>  invoveld_vehicles;
 
-    for (auto& vehicle : vehicles)
+    for (const auto& vehicle : vehicles)
     {
-        // service von map -> get_closest_(ereignisstelle)
-        // calculate distance from vehicle to (ereignisstelle)
-
-        FValue velocity = velocity_fuzzy_func(vehicle.speed); 
-        FValue distance = distance_fuzzy_func(get_distance_event_site(vehicle.position));
-
         // d(r) <= d(r + a)
         auto dir = geometry_msgs::msg::PointStamped();
         dir.point.x = std::cos(vehicle.direction);
         dir.point.y = std::sin(vehicle.direction);
 
         if (
-            get_distance_event_site(vehicle.position) <
+            get_distance_event_site(vehicle.position) ==
             get_distance_event_site(tutils::add(vehicle.position, dir)))
         {
             invoveld_vehicles.push_back(vehicle);
         }
     }
 
-    for (const auto& vehicle : invoveld_vehicles)
+    auto fuzzy_vehicles = apply_fuzzy_logic(invoveld_vehicles);
+
+    // sort vehicles according to involment "involved" fuzzy variable
+    std::sort(fuzzy_vehicles.begin(), fuzzy_vehicles.end(), [](auto const& t1, auto const& t2) {
+        return std::get<1>(t1).first < std::get<1>(t2).first;
+    });
+
+
+    for (const auto& v : fuzzy_vehicles)
     {
-        FValue involvement = 
-        {
-            .first = 0.8, // involved
-            .second = 0.2, // not involved
-            .third = 0
-        }; 
+        RCLCPP_INFO(m_logger, "vin: %d involvement: (%f, %f)\n", std::get<0>(v).vin, std::get<1>(v).first, std::get<1>(v).second);
     }
 
-    // apply fuzzy rules to involveed_vehicles (according to their involvement B)
-
-    return Scenario();
+    return Scenario::S2;
 }
 
 
@@ -80,9 +90,9 @@ FValue ScenarioDetector::velocity_fuzzy_func(float velocity)
 {
     return
     {
-        .first = velocity_standing(velocity),
-        .second = velocity_slow(velocity),
-        .third = velocity_fast(velocity)
+        velocity_standing(velocity),
+        velocity_slow(velocity),
+        velocity_fast(velocity)
     };
 }
 
@@ -103,12 +113,12 @@ float ScenarioDetector::velocity_standing(float velocity)
 
 float ScenarioDetector::velocity_slow(float velocity)
 {
-    if (velocity > 2 && velocity < 7)
+    if (velocity > 2 && velocity <= 7)
     {
         return 1.0 / 5.0 * (velocity - 2.0);
     }
 
-    if (velocity > 2 && velocity <= 7)
+    if (velocity > 7 && velocity <= 10 )
     {
         return 1.0;
     }
@@ -118,10 +128,7 @@ float ScenarioDetector::velocity_slow(float velocity)
         return - 1.0 / 10.0 * (velocity - 20.0);
     }
 
-    if (velocity <= 2 || velocity >= 20)
-    {
-        return 0.0;
-    }
+    return 0.0; // velocity <= 2 || velocity >= 20
 }
 
 float ScenarioDetector::velocity_fast(float velocity)
@@ -136,19 +143,16 @@ float ScenarioDetector::velocity_fast(float velocity)
         return 1.0 / 15.0 * (velocity - 15.0);
     }
 
-    if (velocity >= 30)
-    {
-        return 1.0;
-    }
+    return 1.0; // velocity >= 30
 }
 
 FValue ScenarioDetector::distance_fuzzy_func(const float distance)
 {
     return
     {
-        .first = distance_inside(distance),
-        .second = distance_close(distance),
-        .third = distance_far(distance)
+        distance_inside(distance),
+        distance_close(distance),
+        distance_far(distance)
     };
 }
 
@@ -164,10 +168,7 @@ float ScenarioDetector::distance_inside(float distance)
         return -distance / 2.0;
     }
 
-    if (distance >= 0)
-    {
-        return 0.0;
-    }
+    return 0.0; // distance >= 0
 }
 
 float ScenarioDetector::distance_close(float distance)
@@ -182,10 +183,7 @@ float ScenarioDetector::distance_close(float distance)
         return -distance / 10.0 + 1.0;
     }
 
-    if (distance <= -1 || distance >= 10)
-    {
-        return 0.0;
-    }
+    return 0.0; // distance <= -1 || distance >= 10
 }
 
 float ScenarioDetector::distance_far(float distance)
@@ -200,10 +198,7 @@ float ScenarioDetector::distance_far(float distance)
         return 1.0;
     }
 
-    if (distance <= 5)
-    {
-        return 0.0;
-    }
+    return 0.0;
 }
 
 float ScenarioDetector::get_distance_event_site(const geometry_msgs::msg::PointStamped& position) const
@@ -229,10 +224,19 @@ float ScenarioDetector::get_distance_event_site(const geometry_msgs::msg::PointS
     // Wait for the result.
     if (rclcpp::spin_until_future_complete(node, result) == rclcpp::FutureReturnCode::SUCCESS)
     {
-        RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "res: %f", result.get()->distance);
         return result.get()->distance;
     } else {
         RCLCPP_ERROR(rclcpp::get_logger("rclcpp"), "Failed to call service add_two_ints");
         return 0;
     }
+}
+
+FValue ScenarioDetector::apply_fuzzy_rules(const FValue &speed, const FValue &distance) const
+{
+    return FValue
+    {
+        std::min(distance.second, std::max(speed.second, speed.first)),
+        std::max(speed.third, distance.third),
+        -1 
+    };
 }
