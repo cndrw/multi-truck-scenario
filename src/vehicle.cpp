@@ -174,7 +174,7 @@ private:
                     vehicles.push_back(v.second);
                 }
 
-                const auto solution = m_scenario_solver.solve(Scenario::S1, vehicles);
+                const auto solution = m_scenario_solver.solve(Scenario::S2, vehicles);
                 if (solution != nullptr)
                 {
                     auto solution_msg = mts_msgs::S2Solution();
@@ -282,7 +282,7 @@ private:
         ScenarioSolver m_scenario_solver;
 
         // temp
-        size_t m_count = 2;
+        size_t m_count = 4;
         double m_solution_delay;
         double m_delay_time = 2;
 };
