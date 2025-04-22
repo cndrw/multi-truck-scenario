@@ -111,7 +111,7 @@ class Map : public rclcpp::Node
 
         if (m_static_map[i] == Colors::Black)
         {
-          blocks.push_back(draw_border_block(x, y, 0.25));
+          blocks.push_back(draw_border_block(x, y, 0.25, i));
         }
 
         x++;
@@ -123,7 +123,7 @@ class Map : public rclcpp::Node
       m_border_pub->publish(border);
     }
 
-    visualization_msgs::msg::Marker draw_border_block(const float x, const float y, const float height)
+    visualization_msgs::msg::Marker draw_border_block(const float x, const float y, const float height, const int id)
     {
       auto cube = visualization_msgs::msg::Marker();
       cube.header.stamp = rclcpp::Clock().now();
@@ -131,7 +131,7 @@ class Map : public rclcpp::Node
       cube.action = visualization_msgs::msg::Marker::ADD;
       cube.type = visualization_msgs::msg::Marker::CUBE;
       cube.ns = "border_";
-      cube.id = (x + y) * x * y;
+      cube.id = id;
       cube.pose.position.x = 0.5 + x;
       cube.pose.position.y = 0.5 + y;
       cube.pose.position.z = height / 2.0;
