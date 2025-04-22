@@ -5,20 +5,21 @@
 
 #include "rclcpp/rclcpp.hpp"
 #include "nav_msgs/msg/occupancy_grid.hpp"
-#include "multi_truck_scenario/msg/vehicle_base_data.hpp"
-#include "multi_truck_scenario/msg/s2_solution.hpp"
 #include "geometry_msgs/msg/point.hpp"
 #include "visualization_msgs/msg/marker.hpp"
+
+#include "multi_truck_scenario/msg/vehicle_base_data.hpp"
+#include "multi_truck_scenario/msg/s2_solution.hpp"
+#include "event_site.hpp"
 
 using namespace std::chrono_literals;
 namespace mts_msgs = multi_truck_scenario::msg;
 
-
 enum Colors {
     Red = -128,      // rot für -128 bis -70
     Yellow = -70,    // gelb für -70 bis -2
-    Grey = 0,       // grau für -1 bis 80
-    Black = 100,      // schwarz für 80 bis 100
+    Grey = 0,        // grau für -1 bis 80
+    Black = 100,     // schwarz für 80 bis 100
     Green = 127      // grün (101 bis 127) für Gewinnerfahrzeug in s2_solution_callback
 };
 
@@ -27,20 +28,13 @@ class Map : public rclcpp::Node
   public:
     Map() : rclcpp::Node("map")
     {
-      m_width = 4;
-      m_height = 4;
+      handle_parameters();
       m_resolution = 1;
 
       m_grid.resize(m_height * m_width);
       m_static_map.reserve(m_height * m_width);
 
-      m_static_map = {
-          Colors::Black, Colors::Grey, Colors::Grey, Colors::Black,
-          Colors::Grey, Colors::Grey, Colors::Grey, Colors::Grey,
-          Colors::Grey, Colors::Grey, Colors::Grey, Colors::Grey,
-          Colors::Black, Colors::Grey, Colors::Grey, Colors::Black,
-      };
-
+      m_static_map = map_color_parameter(); // Get the static map
 
       m_grid_pub = this->create_publisher<nav_msgs::msg::OccupancyGrid>("map_data", 10);
       m_cube_pub = this->create_publisher<visualization_msgs::msg::Marker>("cube_dta", 10);
@@ -55,6 +49,37 @@ class Map : public rclcpp::Node
       m_s2_solution_sub = this->create_subscription<mts_msgs::S2Solution>("s2_solution", 10,
         std::bind(&Map::s2_solution_callback, this, std::placeholders::_1)
       );
+    }
+
+    void handle_parameters(){
+        this->declare_parameter("height", 0);
+        this->declare_parameter("width", 0);
+
+        m_height = this->get_parameter("height").as_int();
+        m_width = this->get_parameter("width").as_int();
+
+        // TODO: set event site data
+        // m_event_sites.push_back() 
+    }
+
+    std::vector<Colors> map_color_parameter() {
+        // Declare the parameter and fetch it
+        this->declare_parameter<std::vector<int64_t>>("static_map", {}); // Declare as int64_t
+        std::vector<int64_t> static_map_raw = this->get_parameter("static_map").as_integer_array();
+
+        // Convert to Colors
+        std::vector<Colors> static_map_colors;
+        for (const auto &value : static_map_raw) {
+            if (value >= -128 && value <= 127) {
+                static_map_colors.push_back(static_cast<Colors>(value));
+            } else {
+                RCLCPP_WARN(this->get_logger(), "Value %ld is out of range for Colors enum. Skipping.", value);
+            }
+        }
+
+        // Return the populated vector
+        return static_map_colors;
+        
     }
 
   private:
@@ -153,19 +178,19 @@ class Map : public rclcpp::Node
     {
         const auto& pos = m_vehicles[vin]->position.point;
 
-        // round to the second deximal place and then floor them to fit the grid
+        // round to the second decimal place and then floor them to fit the grid
         const auto rpos_x = std::floor(std::ceil(pos.x * 100.0) / 100.0);
         const auto rpos_y = std::floor(std::ceil(pos.y * 100.0) / 100.0);
 
-        m_grid[rpos_x + rpos_y * m_width] = m_color_map[vin];
+        m_grid[rpos_x + rpos_y * m_width] = static_cast<int8_t>(m_color_map[vin]); // convert Colors enum to int8_t
     }
 
-    void add_to_map(const std::vector<int8_t>& grid)
+    void add_to_map(const std::vector<Colors>& grid)
     {
         for (size_t i = 0; i < m_grid.size(); i++)
         {
-            if (grid[i] == Colors::Grey) continue;
-            m_grid[i] = grid[i];
+            if (grid[i] == Colors::Grey) continue; // Grey means empty
+            m_grid[i] = static_cast<int8_t>(grid[i]); // Map Colors enum to int8_t
         }
     }
 
@@ -183,10 +208,11 @@ class Map : public rclcpp::Node
     std::chrono::milliseconds send_frequenzy = 500ms;
     rclcpp::TimerBase::SharedPtr m_timer;
     std::unordered_map<int, mts_msgs::VehicleBaseData::SharedPtr> m_vehicles;
-    std::vector<int8_t> m_static_map;
+    std::vector<Colors> m_static_map;
     std::vector<int8_t> m_grid;
     std::unordered_map<int, int> m_color_map;
     std::unordered_map<int, std_msgs::msg::ColorRGBA> m_car_visuals;
+    std::vector<EventSite> m_event_sites;
     rclcpp::Publisher<nav_msgs::msg::OccupancyGrid>::SharedPtr m_grid_pub;
     rclcpp::Subscription<mts_msgs::VehicleBaseData>::SharedPtr m_vehicle_sub;
     rclcpp::Subscription<mts_msgs::S2Solution>::SharedPtr m_s2_solution_sub;
