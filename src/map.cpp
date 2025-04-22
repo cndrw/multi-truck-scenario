@@ -5,10 +5,12 @@
 
 #include "rclcpp/rclcpp.hpp"
 #include "nav_msgs/msg/occupancy_grid.hpp"
-#include "multi_truck_scenario/msg/vehicle_base_data.hpp"
-#include "multi_truck_scenario/msg/s2_solution.hpp"
 #include "geometry_msgs/msg/point.hpp"
 #include "visualization_msgs/msg/marker.hpp"
+
+#include "multi_truck_scenario/msg/vehicle_base_data.hpp"
+#include "multi_truck_scenario/msg/s2_solution.hpp"
+#include "event_site.hpp"
 
 using namespace std::chrono_literals;
 namespace mts_msgs = multi_truck_scenario::msg;
@@ -55,6 +57,9 @@ class Map : public rclcpp::Node
 
         m_height = this->get_parameter("height").as_int();
         m_width = this->get_parameter("width").as_int();
+
+        // TODO: set event site data
+        // m_event_sites.push_back() 
     }
 
     std::vector<Colors> map_color_parameter() {
@@ -74,6 +79,7 @@ class Map : public rclcpp::Node
 
         // Return the populated vector
         return static_map_colors;
+        
     }
 
   private:
@@ -202,10 +208,11 @@ class Map : public rclcpp::Node
     std::chrono::milliseconds send_frequenzy = 500ms;
     rclcpp::TimerBase::SharedPtr m_timer;
     std::unordered_map<int, mts_msgs::VehicleBaseData::SharedPtr> m_vehicles;
-    std::vector<int8_t> m_static_map;
+    std::vector<Colors> m_static_map;
     std::vector<int8_t> m_grid;
     std::unordered_map<int, int> m_color_map;
     std::unordered_map<int, std_msgs::msg::ColorRGBA> m_car_visuals;
+    std::vector<EventSite> m_event_sites;
     rclcpp::Publisher<nav_msgs::msg::OccupancyGrid>::SharedPtr m_grid_pub;
     rclcpp::Subscription<mts_msgs::VehicleBaseData>::SharedPtr m_vehicle_sub;
     rclcpp::Subscription<mts_msgs::S2Solution>::SharedPtr m_s2_solution_sub;
