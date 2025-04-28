@@ -59,7 +59,7 @@ void ScenarioSolver::solve_s1()
 
     // get vehicle data from vin
     const auto vehicle = *std::find_if(m_vehicles.begin(), m_vehicles.end(), [priority_car_vin](const auto& v){
-        return v->vin == priority_car_vin;
+        return v.vin == priority_car_vin;
     });
 
     int upgraded_priority_car = get_vehicle(vehicle, Side::left);
@@ -81,23 +81,23 @@ void ScenarioSolver::solve_s2()
     }
 }
 
-int ScenarioSolver::get_vehicle(const mts_msgs::VehicleBaseData::SharedPtr vehicle, Side side)
+int ScenarioSolver::get_vehicle(const mts_msgs::VehicleBaseData& vehicle, Side side)
 {
     int winner_vin = INVALID_VIN;
     constexpr auto reference_angle = 90.0;
-    const auto adjust_angle = reference_angle - vehicle->direction;
+    const auto adjust_angle = reference_angle - vehicle.direction;
 
     for (const auto& other : m_vehicles)
     {
         if (other == vehicle) continue;
 
-        if (is_opposite(vehicle->direction, other->direction))
+        if (is_opposite(vehicle.direction, other.direction))
         {
             continue;
         }
 
         // get direction vector from v1 to v2
-        const auto diff = substract(vehicle->position, other->position);
+        const auto diff = tutils::substract(vehicle.position, other.position);
         
         // angle of the direction vector
         auto diff_angle = std::atan2(diff.point.y, diff.point.x) * RAD2DEG;
@@ -123,7 +123,7 @@ int ScenarioSolver::get_vehicle(const mts_msgs::VehicleBaseData::SharedPtr vehic
 
         if (result)
         {
-            winner_vin = other->vin;
+            winner_vin = other.vin;
         }
     }
 
@@ -143,7 +143,7 @@ int ScenarioSolver::solve_uncontrolled_intersection()
         if (get_vehicle(vehicle, Side::right) == INVALID_VIN)
         {
             m_solution.author_vin = m_owner_vin;
-            return vehicle->vin;
+            return vehicle.vin;
         }
     }
     return INVALID_VIN;

@@ -42,6 +42,7 @@ rosidl_generate_interfaces(${PROJECT_NAME}
 add_library(scenario_lib
   STATIC src/scenario_solver.cpp
          src/scenario_detector.cpp
+         src/classification.cpp
          src/tutils.cpp
 ) 
 

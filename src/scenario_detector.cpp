@@ -8,21 +8,28 @@
 #include "multi_truck_scenario/msg/vehicle_base_data.hpp"
 #include "multi_truck_scenario/srv/get_event_site_distance.hpp"
 #include "tutils.h"
+#include "classification.hpp"
 
 using namespace std::chrono_literals;
 namespace mts_msgs = multi_truck_scenario::msg;
 namespace mts_srvs = multi_truck_scenario::srv;
 
 
-void ScenarioDetector::set_implemenation(const int impl)
+void ScenarioDetector::set_implemenation(const int detector, [[maybe_unused]] const int decision_algo /*impl 2 only*/)
 {
-    m_implementation = impl;
+    m_implementation = detector;
+    m_decision_algo = decision_algo; 
 }
 
 ScenarioDetector::ScenarioDetector() : m_logger(rclcpp::get_logger("detector"))
 {
-    impl[0] = std::bind(&ScenarioDetector::check_1, this, std::placeholders::_1);
-    impl[1] = std::bind(&ScenarioDetector::check_2, this, std::placeholders::_1);
+    using namespace std::placeholders;
+    impl[0] = std::bind(&ScenarioDetector::check_1, this, _1);
+    impl[1] = std::bind(&ScenarioDetector::check_2, this, _1);
+
+    m_decision_algo_impl[0] = std::bind(&ScenarioDetector::decision_tree, this, _1);
+
+    init_decision_tree();
 }
 
 Scenario ScenarioDetector::check(const std::vector<mts_msgs::VehicleBaseData>& vehicles)
@@ -69,18 +76,17 @@ Scenario ScenarioDetector::check_2(const std::vector<mts_msgs::VehicleBaseData>&
         }
     }
 
-    auto fuzzy_vehicles = apply_fuzzy_logic(invoveld_vehicles);
-
-    // sort vehicles according to involment "involved" fuzzy variable
-    std::sort(fuzzy_vehicles.begin(), fuzzy_vehicles.end(), [](auto const& t1, auto const& t2) {
-        return std::get<1>(t1).first < std::get<1>(t2).first;
-    });
-
-
+    /*
     for (const auto& v : fuzzy_vehicles)
     {
         RCLCPP_INFO(m_logger, "vin: %d involvement: (%f, %f)\n", std::get<0>(v).vin, std::get<1>(v).first, std::get<1>(v).second);
     }
+    */
+
+    auto sorted_vehicles = get_sorted_vehicles(invoveld_vehicles);
+    auto scenario = scenario_classification(sorted_vehicles);
+
+    RCLCPP_INFO(m_logger, "detected scenario: %d", scenario);
 
     return Scenario::S2;
 }
@@ -239,4 +245,48 @@ FValue ScenarioDetector::apply_fuzzy_rules(const FValue &speed, const FValue &di
         std::max(speed.third, distance.third),
         -1 
     };
+}
+
+std::vector<mts_msgs::VehicleBaseData> ScenarioDetector::get_sorted_vehicles(const std::vector<mts_msgs::VehicleBaseData>& vehicles)
+{
+    auto fuzzy_vehicles = apply_fuzzy_logic(vehicles);
+
+    // sort vehicles according to involment "involved" fuzzy variable
+    std::sort(fuzzy_vehicles.begin(), fuzzy_vehicles.end(), [](auto const& t1, auto const& t2) {
+        return std::get<1>(t1).first < std::get<1>(t2).first;
+    });
+
+    std::vector<mts_msgs::VehicleBaseData> result(fuzzy_vehicles.size());
+
+    // fuzzy variable no longer needed -> return sorted array of vehicles
+    std::transform(fuzzy_vehicles.begin(), fuzzy_vehicles.end(), result.begin(),
+        [](const auto& t) {
+            return std::get<0>(t);
+        }
+    );
+
+    return result;
+}
+
+Scenario ScenarioDetector::scenario_classification(const std::vector<mts_msgs::VehicleBaseData>& vehicles)
+{
+    return m_decision_algo_impl[m_decision_algo](vehicles);
+}
+
+void ScenarioDetector::init_decision_tree()
+{
+    using Data = std::vector<multi_truck_scenario::msg::VehicleBaseData>;
+
+    m_dtree = std::make_shared<cf::TreeNode<Data>>([](const Data& data) {
+        return data[0].vin == 1;
+    });
+
+    m_dtree->yes = std::make_shared<cf::TreeNode<Data>>(Scenario::S2);
+    m_dtree->no = std::make_shared<cf::TreeNode<Data>>(Scenario::S1);
+}
+
+Scenario ScenarioDetector::decision_tree(const std::vector<mts_msgs::VehicleBaseData>& vehicles) const
+{
+    using Data = std::vector<multi_truck_scenario::msg::VehicleBaseData>;
+    return cf::traverse<Data>(m_dtree, vehicles);
 }

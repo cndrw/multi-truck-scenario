@@ -32,7 +32,7 @@ public:
     {
         handle_parameters();
         m_scenario_solver.set_owner(m_vin);
-        m_scenario_detector.set_implemenation(1);
+        m_scenario_detector.set_implemenation(1, 0);
 
         // Publisher der die Daten der Instanz veröffentlicht
         m_vehicle_pub = this->create_publisher<mts_msgs::VehicleBaseData>("vehicle_base_data", 10);
