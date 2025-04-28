@@ -87,7 +87,7 @@ private:
         m_indicator_state = (Indicator)this->get_parameter("indicator_state").as_int();
         m_engine_state = (Engine)this->get_parameter("engine_state").as_int();
 
-        RCLCPP_INFO(get_logger(), "detector: %d", this->get_parameter("scenario_detector").as_int());
+        // RCLCPP_INFO(get_logger(), "detector: %d", this->get_parameter("scenario_detector").as_int());
     }
 
     void update()
@@ -97,9 +97,35 @@ private:
             return;
         }
 
+        std::vector<mts_msgs::VehicleBaseData> tmp;
+        tmp.reserve(m_nearby_vehicles.size());
+        for (auto& v : m_nearby_vehicles)
+        {
+            tmp.push_back(*v.second);
+        }
+
+        if (tmp.size() != 0)
+        {
+            Scenario scenario = m_scenario_detector.check(tmp);
+            const auto solution = m_scenario_solver.solve(scenario, tmp);
+
+            if (solution == nullptr)
+            {
+                RCLCPP_INFO(this->get_logger(), "solution not valid");
+                return;
+            }
+
+            auto solution_msg = mts_msgs::S2Solution();
+            solution_msg.author_vin = m_vin;
+            solution_msg.winner_vin = solution->winner_vin;
+            m_solution_pub->publish(solution_msg);
+        }
+
+
         move_vehicle();
 
         m_position.header.stamp = rclcpp::Clock().now();
+
         // build the base data package 
         auto vehicle_base_data = mts_msgs::VehicleBaseData();
         vehicle_base_data.header.stamp = rclcpp::Clock().now();
@@ -111,6 +137,7 @@ private:
         vehicle_base_data.indicator_state = static_cast<int>(m_indicator_state);
 
         m_vehicle_pub->publish(vehicle_base_data);
+
     }
 
     void move_vehicle()
@@ -169,34 +196,10 @@ private:
 
         // Handle the received message
         const auto key = vehicle_data->vin;
-        if (m_vehicles.count(key) == 0) 
+        if (m_nearby_vehicles.count(key) == 0) 
         {
-            m_vehicles.emplace(key, vehicle_data);
-            if (m_vehicles.size() == m_count)
-            {
-                // get the list of vehicles from the map
-                std::vector<mts_msgs::VehicleBaseData> vehicles;
-                vehicles.reserve(m_vehicles.size());
-                for (const auto v : m_vehicles)
-                {
-                    vehicles.push_back(*v.second);
-                }
-
-                Scenario scenario = m_scenario_detector.check(vehicles);
-                const auto solution = m_scenario_solver.solve(scenario, vehicles);
-
-                if (solution != nullptr)
-                {
-                    auto solution_msg = mts_msgs::S2Solution();
-                    solution_msg.author_vin = m_vin;
-                    solution_msg.winner_vin = solution->winner_vin;
-                    m_solution_pub->publish(solution_msg);
-                }
-                else
-                {
-                    RCLCPP_INFO(this->get_logger(), "solution not valid");
-                }
-            }
+            RCLCPP_INFO(get_logger(), "add vehicle %d", key);
+            m_nearby_vehicles.emplace(key, vehicle_data);
         }
     }
 
@@ -228,9 +231,9 @@ private:
 
         m_solution_vins.push_back(solution->winner_vin);
 
-        if (m_vehicles.size() == 4)
+        if (m_nearby_vehicles.size() == 4)
         {
-            m_vehicles.clear();
+            m_nearby_vehicles.clear();
             m_solution_vins.clear();
             m_count--;
             m_solution_delay = this->get_clock()->now().seconds() + m_delay_time;
@@ -244,7 +247,7 @@ private:
            return; 
         }
 
-        if (m_solution_vins.size() < m_vehicles.size())
+        if (m_solution_vins.size() < m_nearby_vehicles.size())
         {
             return;
         }
@@ -256,7 +259,7 @@ private:
 
         if (all_equal)
         {
-            m_vehicles.clear();
+            m_nearby_vehicles.clear();
             m_solution_vins.clear();
             m_count--;
             m_solution_delay = this->get_clock()->now().seconds() + m_delay_time;
@@ -280,7 +283,7 @@ private:
         Engine m_engine_state = Engine::on;
 
         rclcpp::TimerBase::SharedPtr m_timer;
-        std::unordered_map<int, mts_msgs::VehicleBaseData::SharedPtr> m_vehicles;
+        std::unordered_map<int, mts_msgs::VehicleBaseData::SharedPtr> m_nearby_vehicles;
 
         rclcpp::Publisher<mts_msgs::VehicleBaseData>::SharedPtr m_vehicle_pub;
         rclcpp::Subscription<mts_msgs::VehicleBaseData>::SharedPtr m_vehicle_sub;

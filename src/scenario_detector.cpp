@@ -231,7 +231,9 @@ float ScenarioDetector::get_distance_event_site(const geometry_msgs::msg::PointS
     if (rclcpp::spin_until_future_complete(node, result) == rclcpp::FutureReturnCode::SUCCESS)
     {
         return result.get()->distance;
-    } else {
+    }
+    else
+    {
         RCLCPP_ERROR(rclcpp::get_logger("rclcpp"), "Failed to call service add_two_ints");
         return 0;
     }
@@ -278,7 +280,7 @@ void ScenarioDetector::init_decision_tree()
     using Data = std::vector<multi_truck_scenario::msg::VehicleBaseData>;
 
     m_dtree = std::make_shared<cf::TreeNode<Data>>([](const Data& data) {
-        return data[0].vin == 1;
+        return data[0].vin == 1 || data[0].vin == 2;
     });
 
     m_dtree->yes = std::make_shared<cf::TreeNode<Data>>(Scenario::S2);
@@ -288,5 +290,6 @@ void ScenarioDetector::init_decision_tree()
 Scenario ScenarioDetector::decision_tree(const std::vector<mts_msgs::VehicleBaseData>& vehicles) const
 {
     using Data = std::vector<multi_truck_scenario::msg::VehicleBaseData>;
+    // RCLCPP_INFO(m_logger, "a: %d, b: %d", vehicles[0].vin, vehicles[1].vin);
     return cf::traverse<Data>(m_dtree, vehicles);
 }
