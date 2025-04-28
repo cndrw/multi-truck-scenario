@@ -52,6 +52,7 @@ public:
             500ms, std::bind(&Vehicle::update, this)
         );
     }
+    ~Vehicle() {}
 
     bool is_active()
     {
@@ -70,8 +71,13 @@ private:
         this->declare_parameter("indicator_state", 0);
         this->declare_parameter("engine_state", 0);
         
+        this->declare_parameter("scenario_detector", 0);
+        this->declare_parameter("decision_algorithm", 0);
+        
         m_position.point.x = this->get_parameter("position_x").as_double();
         m_position.point.y = this->get_parameter("position_y").as_double();
+        m_position.point.z = this->get_parameter("position_z").as_double();
+
         m_position.point.z = this->get_parameter("position_z").as_double();
 
         m_direction = this->get_parameter("direction").as_double();
@@ -80,6 +86,8 @@ private:
         m_speed = this->get_parameter("speed").as_double();
         m_indicator_state = (Indicator)this->get_parameter("indicator_state").as_int();
         m_engine_state = (Engine)this->get_parameter("engine_state").as_int();
+
+        RCLCPP_INFO(get_logger(), "detector: %d", this->get_parameter("scenario_detector").as_int());
     }
 
     void update()
@@ -180,7 +188,7 @@ private:
                 if (solution != nullptr)
                 {
                     auto solution_msg = mts_msgs::S2Solution();
-                    solution_msg.author_vin = solution->author_vin;
+                    solution_msg.author_vin = m_vin;
                     solution_msg.winner_vin = solution->winner_vin;
                     m_solution_pub->publish(solution_msg);
                 }
