@@ -23,6 +23,7 @@ script_dir = Path(__file__).resolve().parent.parent / 'script'
 sys.path.insert(0, str(script_dir))
 # Import the function that generates the RViz-compatible grid data
 from image2grid_converter import generate_rviz_static_map
+from image2scene import exec_script
 ## --------------------------------------------------------------------------------
 
 def generate_launch_description():
@@ -30,6 +31,16 @@ def generate_launch_description():
     # Define image path using Pathlib
     image_path = script_dir / 'scenario_S2.png'
     
+    """
+    Read values from image using the function from image2scene.py
+    This function will return a list of tuples with the crossing values
+    The tuples will contain the width, height, and bottom left corner of the crossing
+    in cpp code then:
+    split crossing vals into n tuples, that can be used to parametrize the map node 
+    """
+    crossing_vals = exec_script(str(image_path))
+
+
     # Generate static map using the function from image_converter.py
     result = generate_rviz_static_map(str(image_path))
     # static_map = result['static_map']
@@ -99,6 +110,7 @@ def generate_launch_description():
                  'height': result['height'],
                  'width': result['width'],
                  'static_map': result['static_map'],
+                 'crossings': crossing_vals,
             }],
         ),
         # launch rviz2 for 
