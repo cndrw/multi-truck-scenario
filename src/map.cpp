@@ -13,6 +13,7 @@
 #include "multi_truck_scenario/msg/vehicle_base_data.hpp"
 #include "multi_truck_scenario/msg/s2_solution.hpp"
 #include "multi_truck_scenario/srv/get_event_site_distance.hpp"
+#include "multi_truck_scenario/srv/get_event_site_id.hpp"
 #include "geometry_msgs/msg/point.hpp"
 #include "event_site.hpp"
 
@@ -48,17 +49,20 @@ class Map : public rclcpp::Node
         send_frequenzy, std::bind(&Map::timer_callback, this)
       );
 
+      using namespace std::placeholders;
       m_vehicle_sub = this->create_subscription<mts_msgs::VehicleBaseData>("vehicle_base_data", 10,
-        std::bind(&Map::vehicle_position_callback, this, std::placeholders::_1)
+        std::bind(&Map::vehicle_position_callback, this, _1)
       );
 
       m_s2_solution_sub = this->create_subscription<mts_msgs::S2Solution>("s2_solution", 10,
-        std::bind(&Map::s2_solution_callback, this, std::placeholders::_1)
+        std::bind(&Map::s2_solution_callback, this, _1)
       );
 
-      using namespace std::placeholders;
-      m_event_site_srv = this->create_service<mts_srvs::GetEventSiteDistance>("get_event_site_distance",
-        std::bind(&Map::distance_nearest_event_site, this, _1, _2));
+      m_esite_dist_srv = this->create_service<mts_srvs::GetEventSiteDistance>("get_event_site_distance",
+        std::bind(&Map::get_event_site_distance, this, _1, _2));
+
+      m_esite_id_srv = this->create_service<mts_srvs::GetEventSiteID>("get_event_site_id",
+        std::bind(&Map::get_event_site_id, this, _1, _2));
       
       m_static_map = map_color_parameter(); // Get the static map
     }
@@ -244,10 +248,16 @@ class Map : public rclcpp::Node
         m_car_visuals[vin] = c;
     }
 
-    void distance_nearest_event_site(const mts_srvs::GetEventSiteDistance::Request::SharedPtr request,
+    void get_event_site_distance(const mts_srvs::GetEventSiteDistance::Request::SharedPtr request,
                                       mts_srvs::GetEventSiteDistance::Response::SharedPtr response)
     {
       response->distance = 2.0;
+    }
+
+    void get_event_site_id(const mts_srvs::GetEventSiteID::Request::SharedPtr request,
+                                      mts_srvs::GetEventSiteID::Response::SharedPtr response)
+    {
+      response->event_site_id = 42;
     }
 
     void add_to_map(const std::vector<Colors>& grid)
@@ -282,7 +292,9 @@ class Map : public rclcpp::Node
     rclcpp::Publisher<nav_msgs::msg::OccupancyGrid>::SharedPtr m_grid_pub;
     rclcpp::Subscription<mts_msgs::VehicleBaseData>::SharedPtr m_vehicle_sub;
     rclcpp::Subscription<mts_msgs::S2Solution>::SharedPtr m_s2_solution_sub;
-    rclcpp::Service<mts_srvs::GetEventSiteDistance>::SharedPtr m_event_site_srv;
+
+    rclcpp::Service<mts_srvs::GetEventSiteDistance>::SharedPtr m_esite_dist_srv;
+    rclcpp::Service<mts_srvs::GetEventSiteID>::SharedPtr m_esite_id_srv;
 
     rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr m_cube_pub;
     rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr m_border_pub;

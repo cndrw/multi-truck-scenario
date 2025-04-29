@@ -31,6 +31,7 @@ set(msg_files
 
 set(srv_files
   "srv/GetEventSiteDistance.srv"
+  "srv/GetEventSiteID.srv"
 )
 
 rosidl_generate_interfaces(${PROJECT_NAME}

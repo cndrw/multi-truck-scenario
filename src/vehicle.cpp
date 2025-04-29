@@ -33,6 +33,7 @@ public:
         handle_parameters();
         m_scenario_solver.set_owner(m_vin);
         m_scenario_detector.set_implemenation(1, 0);
+        m_scenario_detector.set_owner(m_vin);
 
         // Publisher der die Daten der Instanz veröffentlicht
         m_vehicle_pub = this->create_publisher<mts_msgs::VehicleBaseData>("vehicle_base_data", 10);
@@ -198,7 +199,6 @@ private:
         const auto key = vehicle_data->vin;
         if (m_nearby_vehicles.count(key) == 0) 
         {
-            RCLCPP_INFO(get_logger(), "add vehicle %d", key);
             m_nearby_vehicles.emplace(key, vehicle_data);
         }
     }
@@ -284,7 +284,6 @@ private:
 
         rclcpp::TimerBase::SharedPtr m_timer;
         std::unordered_map<int, mts_msgs::VehicleBaseData::SharedPtr> m_nearby_vehicles;
-
         rclcpp::Publisher<mts_msgs::VehicleBaseData>::SharedPtr m_vehicle_pub;
         rclcpp::Subscription<mts_msgs::VehicleBaseData>::SharedPtr m_vehicle_sub;
 

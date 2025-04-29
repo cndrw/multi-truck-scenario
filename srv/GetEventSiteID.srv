@@ -1,0 +1,4 @@
+# GetEventSiteID.srv
+geometry_msgs/PointStamped position
+---
+int64 event_site_id
