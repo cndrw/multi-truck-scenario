@@ -10,7 +10,7 @@
 #include "nav_msgs/msg/occupancy_grid.hpp"
 #include "geometry_msgs/msg/point_stamped.hpp"
 #include "multi_truck_scenario/msg/vehicle_base_data.hpp"
-#include "multi_truck_scenario/msg/s2_solution.hpp"
+#include "multi_truck_scenario/msg/solution.hpp"
 
 #include "scenario_solver.hpp"
 #include "scenario_detector.hpp"
@@ -35,15 +35,15 @@ public:
         // Publisher der die Daten der Instanz veröffentlicht
         m_vehicle_pub = this->create_publisher<mts_msgs::VehicleBaseData>("vehicle_base_data", 10);
 
-        m_solution_pub = this->create_publisher<mts_msgs::S2Solution>("s2_solution", 10);
+        m_solution_pub = this->create_publisher<mts_msgs::Solution>("solution", 10);
 
         // Subscriber der die Werte der anderen Fahrzeuge empfängt
         m_vehicle_sub = this->create_subscription<mts_msgs::VehicleBaseData>(
             "vehicle_base_data", 10, std::bind(&Vehicle::vehicle_position_callback, this, std::placeholders::_1)
         );
 
-         m_solution_sub = this->create_subscription<mts_msgs::S2Solution>(
-            "s2_solution", 10, std::bind(&Vehicle::s2_solution_callback, this, std::placeholders::_1)
+         m_solution_sub = this->create_subscription<mts_msgs::Solution>(
+            "solution", 10, std::bind(&Vehicle::solution_callback, this, std::placeholders::_1)
         );
 
         m_timer = this->create_wall_timer(
@@ -181,7 +181,7 @@ private:
             return;
         }
 
-        // "S2 filter" until scenario detector is build if you own vehicle is moving -> not calculating any sceario
+        // "S2 filter" until scenario detector is build if you own vehicle is moving -> not calculating any scenario
         if (vehicle_data->speed != 0 || m_speed != 0)
         {
             return;
@@ -219,7 +219,7 @@ private:
         return true;
     }
 
-    void s2_solution_callback(const mts_msgs::S2Solution::SharedPtr solution)
+    void solution_callback(const mts_msgs::Solution::SharedPtr solution)
     {
         if(!m_is_active)
         {
@@ -284,8 +284,8 @@ private:
         rclcpp::Publisher<mts_msgs::VehicleBaseData>::SharedPtr m_vehicle_pub;
         rclcpp::Subscription<mts_msgs::VehicleBaseData>::SharedPtr m_vehicle_sub;
 
-        rclcpp::Publisher<mts_msgs::S2Solution>::SharedPtr m_solution_pub;
-        rclcpp::Subscription<mts_msgs::S2Solution>::SharedPtr m_solution_sub;
+        rclcpp::Publisher<mts_msgs::Solution>::SharedPtr m_solution_pub;
+        rclcpp::Subscription<mts_msgs::Solution>::SharedPtr m_solution_sub;
         std::vector<int> m_solution_vins;
 
         ScenarioSolver m_scenario_solver;

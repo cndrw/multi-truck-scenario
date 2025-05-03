@@ -26,7 +26,7 @@ find_package(visualization_msgs REQUIRED)
 
 set(msg_files
   "msg/VehicleBaseData.msg"
-  "msg/S2Solution.msg"
+  "msg/Solution.msg"
 )
 
 set(srv_files

@@ -11,10 +11,11 @@
 
 
 #include "multi_truck_scenario/msg/vehicle_base_data.hpp"
-#include "multi_truck_scenario/msg/s2_solution.hpp"
 #include "multi_truck_scenario/srv/get_event_site_distance.hpp"
 #include "multi_truck_scenario/srv/get_event_site_id.hpp"
 #include "geometry_msgs/msg/point.hpp"
+#include "multi_truck_scenario/msg/solution.hpp"
+
 #include "event_site.hpp"
 
 using namespace std::chrono_literals;
@@ -58,13 +59,14 @@ class Map : public rclcpp::Node
             send_frequenzy, std::bind(&Map::timer_callback, this)
         );
 
+        
+	m_solution_sub = this->create_subscription<mts_msgs::Solution>("solution", 10,
+	    std::bind(&Map::solution_callback, this, std::placeholders::_1)
+        );
+
         using namespace std::placeholders;
         m_vehicle_sub = this->create_subscription<mts_msgs::VehicleBaseData>("vehicle_base_data", 10,
             std::bind(&Map::vehicle_position_callback, this, _1)
-        );
-
-        m_s2_solution_sub = this->create_subscription<mts_msgs::S2Solution>("s2_solution", 10,
-            std::bind(&Map::s2_solution_callback, this, _1)
         );
 
         m_esite_dist_srv = this->create_service<mts_srvs::GetEventSiteDistance>("get_event_site_distance",
@@ -86,7 +88,33 @@ class Map : public rclcpp::Node
 
         // TODO: set event site data
         // m_event_sites.push_back() 
-    }
+        this->declare_parameter("crossing_width_values", std::vector<int>{});
+        this->declare_parameter("crossing_height_values", std::vector<int>{});
+        this->declare_parameter("crossing_bot_left_x_values", std::vector<int>{});
+        this->declare_parameter("crossing_bot_left_y_values", std::vector<int>{});
+
+        const auto width_values = this->get_parameter("crossing_width_values").as_integer_array();
+        const auto height_values = this->get_parameter("crossing_height_values").as_integer_array();
+        const auto bot_left_x_values = this->get_parameter("crossing_bot_left_x_values").as_integer_array();
+        const auto bot_left_y_values = this->get_parameter("crossing_bot_left_y_values").as_integer_array();
+        
+        size_t num_sites = m_width_values.size();
+        if (m_height_values.size() != num_sites || 
+        m_bot_left_x_values.size() != num_sites || 
+        m_bot_left_y_values.size() != num_sites) 
+        {
+            RCLCPP_ERROR(this->get_logger(), "Mismatch in size of crossing parameter arrays!");
+            return;
+        }
+        for (size_t i = 0; i < num_sites; ++i) {
+            EventSite site;
+            site.width = width_values[i];
+            site.height = height_values[i];
+            site.position.x = bot_left_x_values[i];
+            site.position.y = bot_left_y_values[i];
+            site.position.z = 0.0; // Assuming z is always 0 for the event site
+            m_event_sites.emplace(i, site);
+        }
 
     std::vector<Colors> map_color_parameter()
     {
@@ -245,7 +273,7 @@ class Map : public rclcpp::Node
         return pos.x >= m_width || pos.x < 0 || pos.y >= m_height || pos.y < 0;
     }
 
-    void s2_solution_callback(const mts_msgs::S2Solution::SharedPtr solution)
+    void solution_callback(const mts_msgs::Solution::SharedPtr solution)
     {
         const auto vin = solution->winner_vin;
 
@@ -322,10 +350,11 @@ class Map : public rclcpp::Node
     std::vector<int8_t> m_grid;
     std::unordered_map<int, int> m_color_map;
     std::unordered_map<int, std_msgs::msg::ColorRGBA> m_car_visuals;
-    
+
+    std::unordered_map<int, EventSite> m_event_sites;
     rclcpp::Publisher<nav_msgs::msg::OccupancyGrid>::SharedPtr m_grid_pub;
     rclcpp::Subscription<mts_msgs::VehicleBaseData>::SharedPtr m_vehicle_sub;
-    rclcpp::Subscription<mts_msgs::S2Solution>::SharedPtr m_s2_solution_sub;
+    rclcpp::Subscription<mts_msgs::Solution>::SharedPtr m_solution_sub;
 
     std::unordered_map<int, EventSite> m_event_sites;
     rclcpp::Service<mts_srvs::GetEventSiteDistance>::SharedPtr m_esite_dist_srv;

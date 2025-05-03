@@ -7,7 +7,7 @@
 #include "scenario_detector.hpp"
 
 #include "multi_truck_scenario/msg/vehicle_base_data.hpp"
-#include "multi_truck_scenario/msg/s2_solution.hpp"
+#include "multi_truck_scenario/msg/solution.hpp"
 
 
 namespace mts_msgs = multi_truck_scenario::msg;

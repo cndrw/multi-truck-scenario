@@ -1,6 +1,6 @@
 import argparse
 from PIL import Image
-from math import dist
+# from math import dist
 from itertools import combinations
 
 # checks every pixel if yellow
@@ -104,54 +104,133 @@ def is_rectangle_valid_crossing(rect, img):
 
     return True
 
+def distance(p1, p2):
+    # p1 and p2 are tuples of (x, y) coordinates
+    # return dist between x values and y values
+    # return tuple of (x, y) distances
+    x1, y1 = p1
+    x2, y2 = p2
 
-# def is_edge_valid(p1, p2, pixels, height):
-#     valid_colors = {(255, 255, 255), (0, 255, 0)}  # white or green
-#     x1, y1 = p1
-#     x2, y2 = p2
+    return abs(x1 - x2), abs(y1 - y2)
 
-#     # Convert to image coordinates (flip Y-axis)
-#     y1_img = height - 1 - y1
-#     y2_img = height - 1 - y2
 
-#     if x1 == x2:
-#         # Vertical edge
-#         for y in range(min(y1_img, y2_img) + 1, max(y1_img, y2_img)):
-#             if pixels[x1, y][:3] not in valid_colors:
-#                 return False
-#     elif y1 == y2:
-#         # Horizontal edge
-#         y_img = height - 1 - y1
-#         for x in range(min(x1, x2) + 1, max(x1, x2)):
-#             if pixels[x, y_img][:3] not in valid_colors:
-#                 return False
-#     else:
-#         # Not axis-aligned
-#         return False
+def output_values_event(valid_crossing):
+    # output asked values
+    # 1. height of crossing
+    # 2. width of crossing
+    # 3. bot left of crossing
+    # only 1 crossing per execution of this method
+    # iterate over all crossings in the final implementation
+    # return list/tuple - not set yet
 
-#     return True
+    p1, p2, p3, p4 = valid_crossing
+    # p1 = bot left, p2 = top left, p3 = bot right, p4 = top right
+    x_dist, y_dist = distance(p1, p4)  # calculate height and width from diagonal points
 
-# def is_crossing_edge_valid(rect, img):
-#     pixels = img.load()
-#     height = img.height
 
-#     # Sort points by x, then y to get consistent corners
-#     rect = sorted(rect)
-#     xs = sorted([p[0] for p in rect])
-#     ys = sorted([p[1] for p in rect])
+    return (x_dist, y_dist, p1)
+    # width, height, pos bot left
 
-#     # Reconstruct corners based on x/y ranges
-#     top_left = (xs[0], ys[1])
-#     top_right = (xs[1], ys[1])
-#     bottom_left = (xs[0], ys[0])
-#     bottom_right = (xs[1], ys[0])
+def output_values_streets(valid_crossing, image):
+    # output lists of all 4 sides of the crossing
+    # one list for each street
+    # street = (width, direction)	
+    # width = no. of white pixel on edge
+    # direction = (x, y) direction of the street
+    # direction = (1, 0) = right, (0, 1) = up, (-1, 0) = left, (0, -1) = down
+    # return list of lists with all 4 sides of the crossing
+    
+    p1, p2, p3, p4 = valid_crossing
+    # p1 = bot left, p2 = top left, p3 = bot right, p4 = top right
 
-#     return (
-#         is_edge_valid(top_left, top_right, pixels, height) and
-#         is_edge_valid(top_right, bottom_right, pixels, height) and
-#         is_edge_valid(top_left, bottom_left, pixels, height) and
-#         is_edge_valid(bottom_left, bottom_right, pixels, height) 
-#     )
+    img = image.load()
+    width, height = image.size
+    # count white pixels on each edge
+    # left edge (p1 to p2)
+    left = []
+    right = []
+    top = []
+    bottom = []
+
+    left_edge = 0
+    for y in range(p1[1], p2[1] + 1):
+        if img[p1[0], y][:3] == (255, 255, 255):
+            left_edge += 1
+    # right edge (p3 to p4)
+    right_edge = 0 
+    for y in range(p3[1], p4[1] + 1):
+        if img[p3[0], y][:3] == (255, 255, 255):
+            right_edge += 1
+    # top edge (p2 to p4)  
+    top_edge = 0
+    for x in range(p2[0], p4[0] + 1):
+        if img[x, p2[1]][:3] == (255, 255, 255):
+            top_edge += 1
+    # bottom edge (p1 to p3)
+    bottom_edge = 0
+    for x in range(p1[0], p3[0] + 1):
+        if img[x, p1[1]][:3] == (255, 255, 255):
+            bottom_edge += 1
+
+    left.append(left_edge)
+    right.append(right_edge)
+    top.append(top_edge)
+    bottom.append(bottom_edge)
+    # witdhts of the streets
+
+    # now append direction of the streets
+
+    # left direction = (1, 0) = right, (0, 1) = up, (-1, 0) = left, (0, -1) = down
+    left.append((-1, 0))  # left direction
+    right.append((1, 0))  # right direction
+    top.append((0, -1))  # bottom direction
+    bottom.append((0, 1))  # top direction
+    # return list of lists with all 4 sides of the crossing
+    # since top and bottom are switched due to inverted y axis, we need to switch them back
+
+
+    return [left, right, bottom, top]  # left, right, top, bottom
+
+
+def exec_script(image_path):
+    # create method that can be run in another script that only forwards output values
+    # shall be iterared over all crossings
+    # shall return list of tuples with all crossings
+    # use code that works in main() method
+    
+    # img = Image.open(image_path)
+    img = image_path
+
+    yellow_pixels = find_yellow_pixels(img)
+    rectangles = find_rectangle_crossings(yellow_pixels)
+    valid_crossings = [rect for rect in rectangles if is_rectangle_valid_crossing(rect, img)]
+
+    # extend output, so streets are declared
+    # [[event1[str1][str2][str3][str4]], [event2[str1][str2][str3][str4]], ...]
+    # event(width, height, bot left corner)
+    # str(width, (direction)) 
+
+    return [output_values_event(crossing) for crossing in valid_crossings]
+
+def output_lists(output_events):
+
+    width_values = []
+    height_values = []
+    bot_left_x_values = []
+    bot_left_y_values = []
+    # iterate over all events and append values to the lists
+
+    for event in output_events:
+        width_values.append(event[0])
+        height_values.append(event[1])
+        bot_left_x_values.append(event[2][0])
+        bot_left_y_values.append(event[2][1])
+
+    # return list of lists with all values
+    return [width_values, height_values, bot_left_x_values, bot_left_y_values]
+
+def output_final(image_path):
+    return output_lists(exec_script(image_path))
 
 def main():
     # Argument parser for command line input
@@ -167,9 +246,8 @@ def main():
     yellow_pixels = find_yellow_pixels(img)
     print(f"Found {len(yellow_pixels)} yellow pixels.")
 
-    rectangles = find_rectangle_crossings(yellow_pixels)
-
     # print potential crossings - not validated crossings
+    rectangles = find_rectangle_crossings(yellow_pixels)
     print(f"\nDetected {len(rectangles)} potential crossings:")
     for i, rect in enumerate(rectangles):
         print(f"Crossing {i+1}: {rect}")
@@ -179,6 +257,12 @@ def main():
     print(f"\nValidated crossings: {len(valid_crossings)}")
     for i, rect in enumerate(valid_crossings):
         print(f"Crossing {i+1}: {rect}")
+
+    # print(output_values(valid_crossings[]))  # Example output for the first valid crossing
+    print(exec_script(img))  # Example output for the first valid crossing
+    print(output_values_streets(valid_crossings[0], img))  # Example output for the first valid crossing
+    print(output_values_streets(valid_crossings[1], img))  # Example output for the first valid crossing
+    print(output_values_streets(valid_crossings[2], img))  # Example output for the first valid crossing
 
 if __name__ == "__main__":
     main()
