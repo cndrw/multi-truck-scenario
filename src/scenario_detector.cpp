@@ -1,7 +1,7 @@
 /* TODOs:
-*   - sdf implementieren
     - len bei classification ist 0
 *   - kleinen entscheidungsbaum implementieren
+    - s2 falsche reihenfolge
 */
 
 #include <iostream>

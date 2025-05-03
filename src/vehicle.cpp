@@ -95,6 +95,7 @@ private:
             return;
         }
 
+
         std::vector<mts_msgs::VehicleBaseData> tmp;
         tmp.reserve(m_nearby_vehicles.size());
         for (auto& v : m_nearby_vehicles)
@@ -113,7 +114,7 @@ private:
                 return;
             }
 
-            auto solution_msg = mts_msgs::S2Solution();
+            auto solution_msg = mts_msgs::Solution();
             solution_msg.author_vin = m_vin;
             solution_msg.winner_vin = solution->winner_vin;
             m_solution_pub->publish(solution_msg);
@@ -292,7 +293,7 @@ private:
         ScenarioDetector m_scenario_detector;
 
         // temp
-        size_t m_count = 2;
+        size_t m_count = 4;
         double m_solution_delay;
         double m_delay_time = 2;
 };

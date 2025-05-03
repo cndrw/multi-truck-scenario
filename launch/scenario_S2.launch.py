@@ -33,6 +33,7 @@ def generate_launch_description():
     
     # Define image path using Pathlib
     image_path = script_dir / 'scenario_S2.png'
+    # image_path = script_dir / 'big_test.png'
     
     """
     Read values from image using the function from image2scene.py
@@ -43,7 +44,6 @@ def generate_launch_description():
     """
     crossing_vals = output_final(str(image_path))
     width_values,height_values,bot_left_x_values,bot_left_y_values = crossing_vals[0],crossing_vals[1],crossing_vals[2],crossing_vals[3]
-
 
     # Generate static map using the function from image_converter.py
     result = generate_rviz_static_map(str(image_path))
@@ -69,13 +69,14 @@ def generate_launch_description():
     vehicles = [
         {'name': 'vehicle_1', 'vin': 1, 'engine': 0, 'speed': 0.0, 'indicator': 0, 'position_x': 2.0, 'position_y': 0.0, 'position_z': 0.0, 'direction_angle': 90.0},
         {'name': 'vehicle_2', 'vin': 2, 'engine': 0, 'speed': 0.0, 'indicator': 0, 'position_x': 3.0, 'position_y': 2.0, 'position_z': 0.0, 'direction_angle': 180.0}, 
-        # {'name': 'vehicle_3', 'vin': 3, 'engine': 0, 'speed': 0.0, 'indicator': 0, 'position_x': 0.0, 'position_y': 1.0, 'position_z': 0.0, 'direction_angle': 0.0},
-        # {'name': 'vehicle_4', 'vin': 4, 'engine': 0, 'speed': 0.0, 'indicator': 0, 'position_x': 1.0, 'position_y': 3.0, 'position_z': 0.0, 'direction_angle': 270.0}
+        {'name': 'vehicle_3', 'vin': 3, 'engine': 0, 'speed': 0.0, 'indicator': 0, 'position_x': 0.0, 'position_y': 1.0, 'position_z': 0.0, 'direction_angle': 0.0},
+        {'name': 'vehicle_4', 'vin': 4, 'engine': 0, 'speed': 0.0, 'indicator': 0, 'position_x': 1.0, 'position_y': 3.0, 'position_z': 0.0, 'direction_angle': 270.0}
         # Add more vehicles as needed
     ]
 
     dir_offset = 5 # offset in degrees
     offset_val_list = [random.uniform(-dir_offset, dir_offset) for i in range(len(vehicles))] # random offset values
+    width_values = [1, 2, 3]
 
     # add small offset to each angle
     # for i, v in enumerate(vehicles):
@@ -111,13 +112,13 @@ def generate_launch_description():
             ## add parameter for grid data
             ## parameters not yet implemented in map.cpp
             parameters=[{
-                 'height': result['height'],
-                 'width': result['width'],
-                 'static_map': result['static_map'],
-                 'crossing_width_values': width_values,
-                 'crossing_height_values': height_values,
-                 'crossing_bot_left_x_values': bot_left_x_values,
-                 'crossing_bot_left_y_values': bot_left_y_values,
+                'height': result['height'],
+                'width': result['width'],
+                'static_map': result['static_map'],
+                # 'crossing_width_values': width_values,
+                #'crossing_height_values': height_values,
+                #'crossing_bot_left_x_values': bot_left_x_values,
+                #'crossing_bot_left_y_values': bot_left_y_values,
             }],
         ),
         # launch rviz2 for 
