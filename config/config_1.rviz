@@ -6,6 +6,10 @@ Panels:
       Expanded:
         - /Global Options1
         - /Status1
+        - /Marker1
+        - /Marker1/Namespaces1
+        - /MarkerArray1
+        - /MarkerArray1/Status1
       Splitter Ratio: 0.5
     Tree Height: 475
   - Class: rviz_common/Selection
@@ -66,13 +70,28 @@ Visualization Manager:
       Enabled: true
       Name: Marker
       Namespaces:
-        {}
+        1: true
+        2: true
+        3: true
+        4: true
       Topic:
         Depth: 5
         Durability Policy: Volatile
         History Policy: Keep Last
         Reliability Policy: Reliable
         Value: /cube_dta
+      Value: true
+    - Class: rviz_default_plugins/MarkerArray
+      Enabled: true
+      Name: MarkerArray
+      Namespaces:
+        border_: true
+      Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /cube_dta_arr
       Value: true
   Enabled: true
   Global Options:
@@ -132,10 +151,10 @@ Visualization Manager:
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 0.7853981852531433
+      Pitch: 0.5503985285758972
       Target Frame: <Fixed Frame>
       Value: ThirdPersonFollower (rviz_default_plugins)
-      Yaw: 4.123582363128662
+      Yaw: 4.303582668304443
     Saved: ~
 Window Geometry:
   Displays:

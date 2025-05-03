@@ -15,8 +15,11 @@ import sys
 ## --------------------------------------------------------------------------------
 ## Pathlib option - more modern and recommended
 workspace_dir = Path(__file__).resolve().parent.parent
-config_file_path = workspace_dir / 'config' / 'config_1.rviz'
+config_dir = workspace_dir / 'config'
+config_file_path = config_dir / 'config_1.rviz'
 config_file_path = config_file_path.resolve()
+
+params_file = config_dir / 'params.yaml'
 ## --------------------------------------------------------------------------------
 ## Add the script directory to the Python path
 script_dir = Path(__file__).resolve().parent.parent / 'script'
@@ -94,7 +97,7 @@ def generate_launch_description():
                     'position_y': vehicle['position_y'],
                     'position_z': vehicle['position_z'],
                     'direction': vehicle['direction_angle']
-                }],
+                }, params_file],
                 arguments=['--ros-args', '--log-level', 'INFO']
             )
         )

@@ -10,7 +10,7 @@
 #include "nav_msgs/msg/occupancy_grid.hpp"
 #include "geometry_msgs/msg/point_stamped.hpp"
 #include "multi_truck_scenario/msg/vehicle_base_data.hpp"
-#include "multi_truck_scenario/msg/s2_solution.hpp"
+#include "multi_truck_scenario/msg/solution.hpp"
 
 #include "scenario_solver.hpp"
 #include "scenario_detector.hpp"
@@ -36,15 +36,15 @@ public:
         // Publisher der die Daten der Instanz veröffentlicht
         m_vehicle_pub = this->create_publisher<mts_msgs::VehicleBaseData>("vehicle_base_data", 10);
 
-        m_solution_pub = this->create_publisher<mts_msgs::S2Solution>("s2_solution", 10);
+        m_solution_pub = this->create_publisher<mts_msgs::Solution>("solution", 10);
 
         // Subscriber der die Werte der anderen Fahrzeuge empfängt
         m_vehicle_sub = this->create_subscription<mts_msgs::VehicleBaseData>(
             "vehicle_base_data", 10, std::bind(&Vehicle::vehicle_position_callback, this, std::placeholders::_1)
         );
 
-         m_solution_sub = this->create_subscription<mts_msgs::S2Solution>(
-            "s2_solution", 10, std::bind(&Vehicle::s2_solution_callback, this, std::placeholders::_1)
+         m_solution_sub = this->create_subscription<mts_msgs::Solution>(
+            "solution", 10, std::bind(&Vehicle::solution_callback, this, std::placeholders::_1)
         );
 
         m_timer = this->create_wall_timer(
@@ -70,8 +70,13 @@ private:
         this->declare_parameter("indicator_state", 0);
         this->declare_parameter("engine_state", 0);
         
+        this->declare_parameter("scenario_detector", 0);
+        this->declare_parameter("decision_algorithm", 0);
+        
         m_position.point.x = this->get_parameter("position_x").as_double();
         m_position.point.y = this->get_parameter("position_y").as_double();
+        m_position.point.z = this->get_parameter("position_z").as_double();
+
         m_position.point.z = this->get_parameter("position_z").as_double();
 
         m_direction = this->get_parameter("direction").as_double();
@@ -80,6 +85,8 @@ private:
         m_speed = this->get_parameter("speed").as_double();
         m_indicator_state = (Indicator)this->get_parameter("indicator_state").as_int();
         m_engine_state = (Engine)this->get_parameter("engine_state").as_int();
+
+        RCLCPP_INFO(get_logger(), "detector: %d", this->get_parameter("scenario_detector").as_int());
     }
 
     void update()
@@ -148,7 +155,7 @@ private:
             return;
         }
 
-        // "S2 filter" until scenario detector is build if you own vehicle is moving -> not calculating any sceario
+        // "S2 filter" until scenario detector is build if you own vehicle is moving -> not calculating any scenario
         if (vehicle_data->speed != 0 || m_speed != 0)
         {
             return;
@@ -174,10 +181,10 @@ private:
                     vehicles.push_back(v.second);
                 }
 
-                const auto solution = m_scenario_solver.solve(Scenario::S1, vehicles);
+                const auto solution = m_scenario_solver.solve(Scenario::S2, vehicles);
                 if (solution != nullptr)
                 {
-                    auto solution_msg = mts_msgs::S2Solution();
+                    auto solution_msg = mts_msgs::Solution();
                     solution_msg.author_vin = m_vin;
                     solution_msg.winner_vin = solution->winner_vin;
                     m_solution_pub->publish(solution_msg);
@@ -209,7 +216,7 @@ private:
         return true;
     }
 
-    void s2_solution_callback(const mts_msgs::S2Solution::SharedPtr solution)
+    void solution_callback(const mts_msgs::Solution::SharedPtr solution)
     {
         if(!m_is_active)
         {
@@ -275,14 +282,14 @@ private:
         rclcpp::Publisher<mts_msgs::VehicleBaseData>::SharedPtr m_vehicle_pub;
         rclcpp::Subscription<mts_msgs::VehicleBaseData>::SharedPtr m_vehicle_sub;
 
-        rclcpp::Publisher<mts_msgs::S2Solution>::SharedPtr m_solution_pub;
-        rclcpp::Subscription<mts_msgs::S2Solution>::SharedPtr m_solution_sub;
+        rclcpp::Publisher<mts_msgs::Solution>::SharedPtr m_solution_pub;
+        rclcpp::Subscription<mts_msgs::Solution>::SharedPtr m_solution_sub;
         std::vector<int> m_solution_vins;
 
         ScenarioSolver m_scenario_solver;
 
         // temp
-        size_t m_count = 2;
+        size_t m_count = 4;
         double m_solution_delay;
         double m_delay_time = 2;
 };
