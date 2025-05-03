@@ -7,9 +7,11 @@
 #include "nav_msgs/msg/occupancy_grid.hpp"
 #include "geometry_msgs/msg/point.hpp"
 #include "visualization_msgs/msg/marker.hpp"
+#include "visualization_msgs/msg/marker_array.hpp"
+
 
 #include "multi_truck_scenario/msg/vehicle_base_data.hpp"
-#include "multi_truck_scenario/msg/s2_solution.hpp"
+#include "multi_truck_scenario/msg/solution.hpp"
 #include "event_site.hpp"
 
 using namespace std::chrono_literals;
@@ -31,13 +33,14 @@ class Map : public rclcpp::Node
       handle_parameters();
       m_resolution = 1;
 
+
       m_grid.resize(m_height * m_width);
       m_static_map.reserve(m_height * m_width);
 
-      m_static_map = map_color_parameter(); // Get the static map
-
       m_grid_pub = this->create_publisher<nav_msgs::msg::OccupancyGrid>("map_data", 10);
       m_cube_pub = this->create_publisher<visualization_msgs::msg::Marker>("cube_dta", 10);
+      m_border_pub = this->create_publisher<visualization_msgs::msg::MarkerArray>("cube_dta_arr", 10);
+
       m_timer = this->create_wall_timer(
         send_frequenzy, std::bind(&Map::timer_callback, this)
       );
@@ -46,12 +49,15 @@ class Map : public rclcpp::Node
         std::bind(&Map::vehicle_position_callback, this, std::placeholders::_1)
       );
 
-      m_s2_solution_sub = this->create_subscription<mts_msgs::S2Solution>("s2_solution", 10,
-        std::bind(&Map::s2_solution_callback, this, std::placeholders::_1)
+      m_solution_sub = this->create_subscription<mts_msgs::Solution>("solution", 10,
+        std::bind(&Map::solution_callback, this, std::placeholders::_1)
       );
+      
+       m_static_map = map_color_parameter(); // Get the static map
     }
 
-    void handle_parameters(){
+    void handle_parameters()
+    {
         this->declare_parameter("height", 0);
         this->declare_parameter("width", 0);
 
@@ -88,16 +94,20 @@ class Map : public rclcpp::Node
             m_event_sites.emplace(i, site);
         }
 
-    std::vector<Colors> map_color_parameter() {
+    std::vector<Colors> map_color_parameter()
+    {
         // Declare the parameter and fetch it
         this->declare_parameter<std::vector<int64_t>>("static_map", {}); // Declare as int64_t
         std::vector<int64_t> static_map_raw = this->get_parameter("static_map").as_integer_array();
 
         // Convert to Colors
         std::vector<Colors> static_map_colors;
-        for (const auto &value : static_map_raw) {
-            if (value >= -128 && value <= 127) {
+        for (const auto &value : static_map_raw)
+        {
+            if (value >= -128 && value <= 127)
+            {
                 static_map_colors.push_back(static_cast<Colors>(value));
+
             } else {
                 RCLCPP_WARN(this->get_logger(), "Value %ld is out of range for Colors enum. Skipping.", value);
             }
@@ -109,6 +119,58 @@ class Map : public rclcpp::Node
     }
 
   private:
+
+    void draw_border()
+    {
+      int x = 0;
+      int y = 0;
+      std::vector<visualization_msgs::msg::Marker> blocks;
+    
+      
+      for (size_t i = 0; i < m_static_map.size(); i++)
+      {
+        if (i % m_width == 0 && i != 0)
+        {
+          x = 0;
+          y++;
+        }
+
+        if (m_static_map[i] == Colors::Black)
+        {
+          blocks.push_back(draw_border_block(x, y, 0.25, i));
+        }
+
+        x++;
+      }
+
+      auto border = visualization_msgs::msg::MarkerArray();
+      border.markers = blocks;
+  
+      m_border_pub->publish(border);
+    }
+
+    visualization_msgs::msg::Marker draw_border_block(const float x, const float y, const float height, const int id)
+    {
+      auto cube = visualization_msgs::msg::Marker();
+      cube.header.stamp = rclcpp::Clock().now();
+      cube.header.frame_id = "map_frame";
+      cube.action = visualization_msgs::msg::Marker::ADD;
+      cube.type = visualization_msgs::msg::Marker::CUBE;
+      cube.ns = "border_";
+      cube.id = id;
+      cube.pose.position.x = 0.5 + x;
+      cube.pose.position.y = 0.5 + y;
+      cube.pose.position.z = height / 2.0;
+      cube.color.r = 0.0;
+      cube.color.g = 0.0;
+      cube.color.b = 0.0;
+      cube.color.a = 1.0;
+      cube.scale.x = 1.0;
+      cube.scale.y = 1.0;
+      cube.scale.z = height;
+      return cube;
+    }
+
     void draw_car(float x, float y, int id)
     {
       auto cube = visualization_msgs::msg::Marker();
@@ -125,6 +187,7 @@ class Map : public rclcpp::Node
       cube.scale.y = 1.0;
       cube.color.a = 1.0;
       cube.scale.z = 1.0;
+      cube.lifetime = rclcpp::Duration(2, 0);
       m_cube_pub->publish(cube);
     }
     void timer_callback()
@@ -147,7 +210,11 @@ class Map : public rclcpp::Node
       grid.info.origin.orientation.w = 1;
 
       add_to_map(m_static_map);
+      draw_border();
+
+   
       grid.data = m_grid;
+    
 
       m_grid_pub->publish(grid);
 
@@ -156,10 +223,10 @@ class Map : public rclcpp::Node
 
     void vehicle_position_callback(const mts_msgs::VehicleBaseData::SharedPtr vehicle_data)
     {
-/**       if (is_out_of_bound(vehicle_data->position.point))
+        if (is_out_of_bound(vehicle_data->position.point))
         {
-            return;
-        } */
+          return;
+        }
 
         const auto key = vehicle_data->vin;
         if (m_vehicles.count(key) == 0) 
@@ -177,8 +244,6 @@ class Map : public rclcpp::Node
 
         auto pos = vehicle_data->position.point;
         draw_car(pos.x, pos.y, vehicle_data->vin);
-
-        set_vehicle_color(key);
     }
 
     bool is_out_of_bound(const geometry_msgs::msg::Point& pos)
@@ -186,7 +251,7 @@ class Map : public rclcpp::Node
         return pos.x >= m_width || pos.x < 0 || pos.y >= m_height || pos.y < 0;
     }
 
-    void s2_solution_callback(const mts_msgs::S2Solution::SharedPtr solution)
+    void solution_callback(const mts_msgs::Solution::SharedPtr solution)
     {
         const auto vin = solution->winner_vin;
 
@@ -196,19 +261,6 @@ class Map : public rclcpp::Node
         c.g = 1;
         c.r = 0;
         m_car_visuals[vin] = c;
-
-        set_vehicle_color(vin);
-    }
-
-    void set_vehicle_color(const int vin)
-    {
-        const auto& pos = m_vehicles[vin]->position.point;
-
-        // round to the second decimal place and then floor them to fit the grid
-        const auto rpos_x = std::floor(std::ceil(pos.x * 100.0) / 100.0);
-        const auto rpos_y = std::floor(std::ceil(pos.y * 100.0) / 100.0);
-
-        m_grid[rpos_x + rpos_y * m_width] = static_cast<int8_t>(m_color_map[vin]); // convert Colors enum to int8_t
     }
 
     void add_to_map(const std::vector<Colors>& grid)
@@ -241,11 +293,11 @@ class Map : public rclcpp::Node
     std::unordered_map<int, EventSite> m_event_sites;
     rclcpp::Publisher<nav_msgs::msg::OccupancyGrid>::SharedPtr m_grid_pub;
     rclcpp::Subscription<mts_msgs::VehicleBaseData>::SharedPtr m_vehicle_sub;
-    rclcpp::Subscription<mts_msgs::S2Solution>::SharedPtr m_s2_solution_sub;
+    rclcpp::Subscription<mts_msgs::Solution>::SharedPtr m_solution_sub;
 
     rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr m_cube_pub;
+    rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr m_border_pub;
 };
-
 int main(int argc, char * argv[])
 {
   rclcpp::init(argc, argv);
