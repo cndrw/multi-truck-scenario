@@ -1,0 +1,4 @@
+/**:
+  ros__parameters:
+    scenario_detector: 1
+    decision_algorithm: 0
