@@ -60,7 +60,33 @@ class Map : public rclcpp::Node
 
         // TODO: set event site data
         // m_event_sites.push_back() 
-    }
+        this->declare_parameter("crossing_width_values", std::vector<int>{});
+        this->declare_parameter("crossing_height_values", std::vector<int>{});
+        this->declare_parameter("crossing_bot_left_x_values", std::vector<int>{});
+        this->declare_parameter("crossing_bot_left_y_values", std::vector<int>{});
+
+        const auto width_values = this->get_parameter("crossing_width_values").as_integer_array();
+        const auto height_values = this->get_parameter("crossing_height_values").as_integer_array();
+        const auto bot_left_x_values = this->get_parameter("crossing_bot_left_x_values").as_integer_array();
+        const auto bot_left_y_values = this->get_parameter("crossing_bot_left_y_values").as_integer_array();
+        
+        size_t num_sites = m_width_values.size();
+        if (m_height_values.size() != num_sites || 
+        m_bot_left_x_values.size() != num_sites || 
+        m_bot_left_y_values.size() != num_sites) 
+        {
+            RCLCPP_ERROR(this->get_logger(), "Mismatch in size of crossing parameter arrays!");
+            return;
+        }
+        for (size_t i = 0; i < num_sites; ++i) {
+            EventSite site;
+            site.width = width_values[i];
+            site.height = height_values[i];
+            site.position.x = bot_left_x_values[i];
+            site.position.y = bot_left_y_values[i];
+            site.position.z = 0.0; // Assuming z is always 0 for the event site
+            m_event_sites.emplace(i, site);
+        }
 
     std::vector<Colors> map_color_parameter() {
         // Declare the parameter and fetch it
@@ -212,7 +238,7 @@ class Map : public rclcpp::Node
     std::vector<int8_t> m_grid;
     std::unordered_map<int, int> m_color_map;
     std::unordered_map<int, std_msgs::msg::ColorRGBA> m_car_visuals;
-    std::vector<EventSite> m_event_sites;
+    std::unordered_map<int, EventSite> m_event_sites;
     rclcpp::Publisher<nav_msgs::msg::OccupancyGrid>::SharedPtr m_grid_pub;
     rclcpp::Subscription<mts_msgs::VehicleBaseData>::SharedPtr m_vehicle_sub;
     rclcpp::Subscription<mts_msgs::S2Solution>::SharedPtr m_s2_solution_sub;
