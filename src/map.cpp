@@ -11,7 +11,7 @@
 
 
 #include "multi_truck_scenario/msg/vehicle_base_data.hpp"
-#include "multi_truck_scenario/msg/s2_solution.hpp"
+#include "multi_truck_scenario/msg/solution.hpp"
 #include "event_site.hpp"
 
 using namespace std::chrono_literals;
@@ -49,8 +49,8 @@ class Map : public rclcpp::Node
         std::bind(&Map::vehicle_position_callback, this, std::placeholders::_1)
       );
 
-      m_s2_solution_sub = this->create_subscription<mts_msgs::S2Solution>("s2_solution", 10,
-        std::bind(&Map::s2_solution_callback, this, std::placeholders::_1)
+      m_solution_sub = this->create_subscription<mts_msgs::Solution>("solution", 10,
+        std::bind(&Map::solution_callback, this, std::placeholders::_1)
       );
       
        m_static_map = map_color_parameter(); // Get the static map
@@ -225,7 +225,7 @@ class Map : public rclcpp::Node
         return pos.x >= m_width || pos.x < 0 || pos.y >= m_height || pos.y < 0;
     }
 
-    void s2_solution_callback(const mts_msgs::S2Solution::SharedPtr solution)
+    void solution_callback(const mts_msgs::Solution::SharedPtr solution)
     {
         const auto vin = solution->winner_vin;
 
@@ -268,7 +268,7 @@ class Map : public rclcpp::Node
     std::vector<EventSite> m_event_sites;
     rclcpp::Publisher<nav_msgs::msg::OccupancyGrid>::SharedPtr m_grid_pub;
     rclcpp::Subscription<mts_msgs::VehicleBaseData>::SharedPtr m_vehicle_sub;
-    rclcpp::Subscription<mts_msgs::S2Solution>::SharedPtr m_s2_solution_sub;
+    rclcpp::Subscription<mts_msgs::Solution>::SharedPtr m_solution_sub;
 
     rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr m_cube_pub;
     rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr m_border_pub;
