@@ -14,16 +14,13 @@
 
 #include "scenario_solver.hpp"
 #include "scenario_detector.hpp"
+#include "tutils.h"
 
 using namespace std::chrono_literals;
 namespace mts_msgs = multi_truck_scenario::msg;
 
 enum class Indicator { off, left, right, warning };
 enum class Engine { on, off };
-
-static constexpr auto RAD2DEG { 180 / M_PI };
-static constexpr auto DEG2RAD { M_PI / 180 };
-
 
 class Vehicle : public rclcpp::Node
 {
@@ -148,8 +145,8 @@ private:
         const auto delta_time = now_time - last_time;
 
         // get driving direction
-        const double dy = std::sin(m_direction * DEG2RAD);
-        const double dx = std::cos(m_direction * DEG2RAD);
+        const double dy = std::sin(m_direction * tutils::DEG2RAD);
+        const double dx = std::cos(m_direction * tutils::DEG2RAD);
 
         const double delta_move = m_speed * delta_time.seconds();
         m_position.point.x += delta_move * dx;

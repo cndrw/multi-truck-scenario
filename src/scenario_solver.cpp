@@ -8,7 +8,6 @@
 
 static constexpr uint8_t S1_MAX_VEHICLES { 3 };
 static constexpr uint8_t S2_MAX_VEHICLES { 4 };
-static constexpr auto RAD2DEG { 180 / M_PI };
 static constexpr auto INVALID_VIN { -1 };
 
 void ScenarioSolver::set_owner(int vin)
@@ -100,7 +99,7 @@ int ScenarioSolver::get_vehicle(const mts_msgs::VehicleBaseData& vehicle, Side s
         const auto diff = tutils::substract(vehicle.position, other.position);
         
         // angle of the direction vector
-        auto diff_angle = std::atan2(diff.point.y, diff.point.x) * RAD2DEG;
+        auto diff_angle = std::atan2(diff.point.y, diff.point.x) * tutils::RAD2DEG;
 
         diff_angle += adjust_angle; // also adjust the angle of the differenz vector
 

@@ -34,37 +34,46 @@ class Map : public rclcpp::Node
   public:
     Map() : rclcpp::Node("map")
     {
-      handle_parameters();
-      m_resolution = 1;
+        handle_parameters();
+        m_resolution = 1;
+
+        EventSite e;
+        auto pos  = geometry_msgs::msg::Point();
+        pos.x = 1;
+        pos.y = 1;
+        e.position = pos;
+        e.width = 2;
+        e.height = 2;
+        m_event_sites.emplace(0, e);
 
 
-      m_grid.resize(m_height * m_width);
-      m_static_map.reserve(m_height * m_width);
+        m_grid.resize(m_height * m_width);
+        m_static_map.reserve(m_height * m_width);
 
-      m_grid_pub = this->create_publisher<nav_msgs::msg::OccupancyGrid>("map_data", 10);
-      m_cube_pub = this->create_publisher<visualization_msgs::msg::Marker>("cube_dta", 10);
-      m_border_pub = this->create_publisher<visualization_msgs::msg::MarkerArray>("cube_dta_arr", 10);
+        m_grid_pub = this->create_publisher<nav_msgs::msg::OccupancyGrid>("map_data", 10);
+        m_cube_pub = this->create_publisher<visualization_msgs::msg::Marker>("cube_dta", 10);
+        m_border_pub = this->create_publisher<visualization_msgs::msg::MarkerArray>("cube_dta_arr", 10);
 
-      m_timer = this->create_wall_timer(
-        send_frequenzy, std::bind(&Map::timer_callback, this)
-      );
+        m_timer = this->create_wall_timer(
+            send_frequenzy, std::bind(&Map::timer_callback, this)
+        );
 
-      using namespace std::placeholders;
-      m_vehicle_sub = this->create_subscription<mts_msgs::VehicleBaseData>("vehicle_base_data", 10,
-        std::bind(&Map::vehicle_position_callback, this, _1)
-      );
+        using namespace std::placeholders;
+        m_vehicle_sub = this->create_subscription<mts_msgs::VehicleBaseData>("vehicle_base_data", 10,
+            std::bind(&Map::vehicle_position_callback, this, _1)
+        );
 
-      m_s2_solution_sub = this->create_subscription<mts_msgs::S2Solution>("s2_solution", 10,
-        std::bind(&Map::s2_solution_callback, this, _1)
-      );
+        m_s2_solution_sub = this->create_subscription<mts_msgs::S2Solution>("s2_solution", 10,
+            std::bind(&Map::s2_solution_callback, this, _1)
+        );
 
-      m_esite_dist_srv = this->create_service<mts_srvs::GetEventSiteDistance>("get_event_site_distance",
-        std::bind(&Map::get_event_site_distance, this, _1, _2));
+        m_esite_dist_srv = this->create_service<mts_srvs::GetEventSiteDistance>("get_event_site_distance",
+            std::bind(&Map::get_event_site_distance, this, _1, _2));
 
-      m_esite_id_srv = this->create_service<mts_srvs::GetEventSiteID>("get_event_site_id",
-        std::bind(&Map::get_event_site_id, this, _1, _2));
-      
-      m_static_map = map_color_parameter(); // Get the static map
+        m_esite_id_srv = this->create_service<mts_srvs::GetEventSiteID>("get_event_site_id",
+            std::bind(&Map::get_event_site_id, this, _1, _2));
+        
+        m_static_map = map_color_parameter(); // Get the static map
     }
 
     void handle_parameters()
@@ -251,13 +260,39 @@ class Map : public rclcpp::Node
     void get_event_site_distance(const mts_srvs::GetEventSiteDistance::Request::SharedPtr request,
                                       mts_srvs::GetEventSiteDistance::Response::SharedPtr response)
     {
-      response->distance = 2.0;
+        const auto& event_site = m_event_sites[request->event_site_id];
+        response->distance = calc_distance(event_site, request->position);
     }
 
     void get_event_site_id(const mts_srvs::GetEventSiteID::Request::SharedPtr request,
                                       mts_srvs::GetEventSiteID::Response::SharedPtr response)
     {
-      response->event_site_id = 42;
+        const auto& pos = request->position;
+        std::vector<std::pair<int, EventSite>> sites(m_event_sites.begin(), m_event_sites.end());
+
+        std::sort(sites.begin(), sites.end(), [this, pos](const auto& s1, const auto& s2) {
+            return this->calc_distance(s1.second, pos) < this->calc_distance(s2.second, pos);
+        });
+
+        response->event_site_id = sites[0].first;
+    }
+
+    // calculate the distance from an position to the given event side with an box sdf
+    double calc_distance(const EventSite& event_site, const geometry_msgs::msg::PointStamped& pos)
+    {
+        const auto& box_pos = event_site.position;
+        float cx = box_pos.x + event_site.width * 0.5f;
+        float cy = box_pos.y + event_site.height * 0.5f;
+
+        // const auto dx = std::max(pos.point.x - box_pos.x, double { 0 });
+        const auto dx = std::fabs(pos.point.x - cx) - event_site.height * 0.5f;
+        // const auto dy = std::max(pos.point.y - box_pos.y, double { 0 });
+        const auto dy = std::fabs(pos.point.y - cy) - event_site.width * 0.5f;
+
+        float outside = std::sqrt(std::max(dx, 0.0) * std::max(dx, 0.0) +
+                                  std::max(dy, 0.0) * std::max(dy, 0.0));
+        const auto inside = std::min(std::max(dx, dy), 0.0);
+        return outside + inside;
     }
 
     void add_to_map(const std::vector<Colors>& grid)
@@ -288,11 +323,11 @@ class Map : public rclcpp::Node
     std::unordered_map<int, int> m_color_map;
     std::unordered_map<int, std_msgs::msg::ColorRGBA> m_car_visuals;
     
-    std::vector<EventSite> m_event_sites;
     rclcpp::Publisher<nav_msgs::msg::OccupancyGrid>::SharedPtr m_grid_pub;
     rclcpp::Subscription<mts_msgs::VehicleBaseData>::SharedPtr m_vehicle_sub;
     rclcpp::Subscription<mts_msgs::S2Solution>::SharedPtr m_s2_solution_sub;
 
+    std::unordered_map<int, EventSite> m_event_sites;
     rclcpp::Service<mts_srvs::GetEventSiteDistance>::SharedPtr m_esite_dist_srv;
     rclcpp::Service<mts_srvs::GetEventSiteID>::SharedPtr m_esite_id_srv;
 

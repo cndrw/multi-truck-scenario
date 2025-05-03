@@ -1,3 +1,9 @@
+/* TODOs:
+*   - sdf implementieren
+    - len bei classification ist 0
+*   - kleinen entscheidungsbaum implementieren
+*/
+
 #include <iostream>
 #include <vector>
 
@@ -110,11 +116,11 @@ Scenario ScenarioDetector::check_2(const std::vector<mts_msgs::VehicleBaseData>&
     {
         // d(r) <= d(r + a)
         auto dir = geometry_msgs::msg::PointStamped();
-        dir.point.x = std::cos(vehicle.direction);
-        dir.point.y = std::sin(vehicle.direction);
+        dir.point.x = std::cos(vehicle.direction * tutils::DEG2RAD);
+        dir.point.y = std::sin(vehicle.direction * tutils::DEG2RAD);
 
         if (
-            get_event_site_distance(vehicle.position) ==
+            get_event_site_distance(vehicle.position) >=
             get_event_site_distance(tutils::add(vehicle.position, dir)))
         {
             invoveld_vehicles.push_back(vehicle);
@@ -328,7 +334,11 @@ void ScenarioDetector::init_decision_tree()
 
 Scenario ScenarioDetector::decision_tree(const std::vector<mts_msgs::VehicleBaseData>& vehicles) const
 {
+    if (vehicles.empty())
+    {
+        return Scenario::None;
+    }
+
     using Data = std::vector<multi_truck_scenario::msg::VehicleBaseData>;
-    // RCLCPP_INFO(m_logger, "a: %d, b: %d", vehicles[0].vin, vehicles[1].vin);
     return cf::traverse<Data>(m_dtree, vehicles);
 }
