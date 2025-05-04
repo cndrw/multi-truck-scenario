@@ -12,6 +12,7 @@
 #include "multi_truck_scenario/msg/vehicle_base_data.hpp"
 #include "multi_truck_scenario/srv/get_event_site_distance.hpp"
 #include "multi_truck_scenario/srv/get_event_site_id.hpp"
+#include "multi_truck_scenario/msg/event_site_data.hpp"
 #include "tutils.h"
 #include "classification.hpp"
 
@@ -52,7 +53,7 @@ Scenario ScenarioDetector::check_1([[maybe_unused]] const std::vector<mts_msgs::
     return Scenario();
 }
 
-int ScenarioDetector::get_event_site(const mts_msgs::VehicleBaseData &vehicle)
+std::pair<int, mts_msgs::EventSiteData> ScenarioDetector::get_event_site(const mts_msgs::VehicleBaseData &vehicle)
 {
     std::shared_ptr<rclcpp::Node> node = rclcpp::Node::make_shared("map_requester");
     rclcpp::Client<mts_srvs::GetEventSiteID>::SharedPtr client =
@@ -75,23 +76,23 @@ int ScenarioDetector::get_event_site(const mts_msgs::VehicleBaseData &vehicle)
     // Wait for the result.
     if (rclcpp::spin_until_future_complete(node, result) == rclcpp::FutureReturnCode::SUCCESS)
     {
-        return result.get()->event_site_id;
+        return {result.get()->id, result.get()->event_site};
     }
     else
     {
         RCLCPP_ERROR(rclcpp::get_logger("rclcpp"), "Failed to call service add_two_ints");
-        return 0;
+        return std::pair<int, mts_msgs::EventSiteData>{};
     }
 }
 
 std::vector<std::tuple<mts_msgs::VehicleBaseData, FValue>> 
-ScenarioDetector::apply_fuzzy_logic(const std::vector<mts_msgs::VehicleBaseData>& vehicles) 
+ScenarioDetector::apply_fuzzy_logic(const std::vector<mts_msgs::VehicleBaseData>& vehicles, const int id) 
 {
     std::vector<std::tuple<mts_msgs::VehicleBaseData, FValue>> fuzzy_vehicles;
     for (const auto& vehicle : vehicles)
     {
         FValue velocity = velocity_fuzzy_func(vehicle.speed); 
-        FValue distance = distance_fuzzy_func(get_event_site_distance(vehicle.position));
+        FValue distance = distance_fuzzy_func(get_event_site_distance(vehicle.position, id));
         // apply fuzzy rules to involveed_vehicles (according to their involvement B)
         FValue involvement = apply_fuzzy_rules(velocity, distance);
         fuzzy_vehicles.push_back({vehicle, involvement});
@@ -108,7 +109,9 @@ Scenario ScenarioDetector::check_2(const std::vector<mts_msgs::VehicleBaseData>&
         return v.vin == this->m_owner_vin;
     });
 
-    m_cur_event_site_id = get_event_site(owner_vehicle);
+    const auto event_site = get_event_site(owner_vehicle);
+    const auto site_id = event_site.first;
+    const auto site_data = event_site.second;
 
     for (const auto& vehicle : vehicles)
     {
@@ -118,8 +121,8 @@ Scenario ScenarioDetector::check_2(const std::vector<mts_msgs::VehicleBaseData>&
         dir.point.y = std::sin(vehicle.direction * tutils::DEG2RAD);
 
         if (
-            get_event_site_distance(vehicle.position) >=
-            get_event_site_distance(tutils::add(vehicle.position, dir)))
+            get_event_site_distance(vehicle.position, site_id) >=
+            get_event_site_distance(tutils::add(vehicle.position, dir), site_id))
         {
             invoveld_vehicles.push_back(vehicle);
         }
@@ -136,12 +139,12 @@ Scenario ScenarioDetector::check_2(const std::vector<mts_msgs::VehicleBaseData>&
         return Scenario::None;
     }
 
-    auto sorted_vehicles = get_sorted_vehicles(invoveld_vehicles);
-    auto scenario = scenario_classification(sorted_vehicles);
+    auto sorted_vehicles = get_sorted_vehicles(invoveld_vehicles, site_id);
+    auto scenario = scenario_classification({sorted_vehicles, site_data});
 
     RCLCPP_INFO(m_logger, "Vehicle %d detected scenario: %d", m_owner_vin, scenario);
 
-    return Scenario::S2;
+    return scenario;
 }
 
 
@@ -260,7 +263,7 @@ float ScenarioDetector::distance_far(float distance)
     return 0.0;
 }
 
-float ScenarioDetector::get_event_site_distance(const geometry_msgs::msg::PointStamped& position) const
+float ScenarioDetector::get_event_site_distance(const geometry_msgs::msg::PointStamped& position, const int id) const
 {
     std::shared_ptr<rclcpp::Node> node = rclcpp::Node::make_shared("map_requester");
     rclcpp::Client<mts_srvs::GetEventSiteDistance>::SharedPtr client =
@@ -268,7 +271,7 @@ float ScenarioDetector::get_event_site_distance(const geometry_msgs::msg::PointS
 
     auto request = std::make_shared<mts_srvs::GetEventSiteDistance::Request>();
     request->position = position;
-    request->event_site_id = m_cur_event_site_id;
+    request->event_site_id = id;
 
     while (!client->wait_for_service(1s))
     {
@@ -303,9 +306,9 @@ FValue ScenarioDetector::apply_fuzzy_rules(const FValue &speed, const FValue &di
     };
 }
 
-std::vector<mts_msgs::VehicleBaseData> ScenarioDetector::get_sorted_vehicles(const std::vector<mts_msgs::VehicleBaseData>& vehicles)
+std::vector<mts_msgs::VehicleBaseData> ScenarioDetector::get_sorted_vehicles(const std::vector<mts_msgs::VehicleBaseData>& vehicles, const int id)
 {
-    auto fuzzy_vehicles = apply_fuzzy_logic(vehicles);
+    auto fuzzy_vehicles = apply_fuzzy_logic(vehicles, id);
 
     // sort vehicles according to involment "involved" fuzzy variable
     std::sort(fuzzy_vehicles.begin(), fuzzy_vehicles.end(), [](auto const& t1, auto const& t2) {
@@ -324,25 +327,31 @@ std::vector<mts_msgs::VehicleBaseData> ScenarioDetector::get_sorted_vehicles(con
     return result;
 }
 
-Scenario ScenarioDetector::scenario_classification(const std::vector<mts_msgs::VehicleBaseData>& vehicles)
+Scenario ScenarioDetector::scenario_classification(const DecisionData& data)
 {
-    return m_decision_algo_impl[m_decision_algo](vehicles);
+    return m_decision_algo_impl[m_decision_algo](data);
 }
 
 void ScenarioDetector::init_decision_tree()
 {
-    using Data = std::vector<multi_truck_scenario::msg::VehicleBaseData>;
-
-    m_dtree = std::make_shared<cf::TreeNode<Data>>([](const Data& data) {
-        return data[0].vin == 1 || data[0].vin == 2;
+    m_dtree = std::make_shared<cf::TreeNode<DecisionData>>([this](const DecisionData& data) {
+        RCLCPP_INFO(m_logger, "num_streets: %d", data.second.num_streets);
+        return data.second.num_streets > 2;
     });
 
-    m_dtree->yes = std::make_shared<cf::TreeNode<Data>>(Scenario::S2);
-    m_dtree->no = std::make_shared<cf::TreeNode<Data>>(Scenario::S1);
+    m_dtree->no = std::make_shared<cf::TreeNode<DecisionData>>(Scenario::None); // potential Scenario s3
+
+    m_dtree->yes = std::make_shared<cf::TreeNode<DecisionData>>([this](const DecisionData& data){
+        // temporary decision between S1 & S2 until the width of the streets is present
+        RCLCPP_INFO(m_logger, "num vehicles: %d", data.first.size());
+        return data.first.size() > 2;
+    });
+
+    m_dtree->yes->yes = std::make_shared<cf::TreeNode<DecisionData>>(Scenario::S2);
+    m_dtree->yes->no = std::make_shared<cf::TreeNode<DecisionData>>(Scenario::S1);
 }
 
-Scenario ScenarioDetector::decision_tree(const std::vector<mts_msgs::VehicleBaseData>& vehicles) const
+Scenario ScenarioDetector::decision_tree(const DecisionData& data) const
 {
-    using Data = std::vector<multi_truck_scenario::msg::VehicleBaseData>;
-    return cf::traverse<Data>(m_dtree, vehicles);
+    return cf::traverse<DecisionData>(m_dtree, data);
 }

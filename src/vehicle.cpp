@@ -123,6 +123,7 @@ private:
         if (tmp.size() != 0)
         {
             Scenario scenario = m_scenario_detector.check(tmp);
+            RCLCPP_INFO(get_logger(), "start solution of %d", scenario);
             const auto solution = m_scenario_solver.solve(scenario, tmp);
 
             if (solution == nullptr)

@@ -1,4 +1,7 @@
 # GetEventSiteID.srv
+# import my_package/msg/MyType
+
 geometry_msgs/PointStamped position
 ---
-int64 event_site_id
+int64 id
+multi_truck_scenario/EventSiteData event_site

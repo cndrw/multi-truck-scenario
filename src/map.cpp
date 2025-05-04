@@ -274,13 +274,6 @@ class Map : public rclcpp::Node
         m_car_visuals[vin] = c;
     }
 
-    void get_event_site_distance(const mts_srvs::GetEventSiteDistance::Request::SharedPtr request,
-                                      mts_srvs::GetEventSiteDistance::Response::SharedPtr response)
-    {
-        const auto& event_site = m_event_sites[request->event_site_id];
-        response->distance = calc_distance(event_site, request->position);
-    }
-
     void get_event_site_id(const mts_srvs::GetEventSiteID::Request::SharedPtr request,
                                       mts_srvs::GetEventSiteID::Response::SharedPtr response)
     {
@@ -291,7 +284,16 @@ class Map : public rclcpp::Node
             return this->calc_distance(s1.second, pos) < this->calc_distance(s2.second, pos);
         });
 
-        response->event_site_id = sites[0].first;
+        response->id = sites[0].first;
+        response->event_site.position = sites[0].second.position;
+        response->event_site.num_streets = 4;
+    }
+
+    void get_event_site_distance(const mts_srvs::GetEventSiteDistance::Request::SharedPtr request,
+                                      mts_srvs::GetEventSiteDistance::Response::SharedPtr response)
+    {
+        const auto& event_site = m_event_sites[request->event_site_id];
+        response->distance = calc_distance(event_site, request->position);
     }
 
     // calculate the distance from an position to the given event side with an box sdf

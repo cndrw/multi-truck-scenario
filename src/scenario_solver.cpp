@@ -69,6 +69,7 @@ void ScenarioSolver::solve_s1()
 
 void ScenarioSolver::solve_s2()
 {
+    RCLCPP_INFO(m_logger, "solve s2");
     if (m_vehicles.size() == S2_MAX_VEHICLES)
     {
         pick_random_vehicle();
