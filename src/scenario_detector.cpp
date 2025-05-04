@@ -1,7 +1,5 @@
 /* TODOs:
-    - len bei classification ist 0
 *   - kleinen entscheidungsbaum implementieren
-    - s2 falsche reihenfolge
 */
 
 #include <iostream>
@@ -125,12 +123,23 @@ Scenario ScenarioDetector::check_2(const std::vector<mts_msgs::VehicleBaseData>&
         {
             invoveld_vehicles.push_back(vehicle);
         }
+        else if (vehicle.vin == m_owner_vin)
+        {
+            RCLCPP_INFO(m_logger, "Vehicle %d is not involved in viewed scenario");
+            return Scenario::None;
+        }
+    }
+
+    if (invoveld_vehicles.empty())
+    {
+        RCLCPP_INFO(m_logger, "No Vehicle where involved in viewed scenario");
+        return Scenario::None;
     }
 
     auto sorted_vehicles = get_sorted_vehicles(invoveld_vehicles);
     auto scenario = scenario_classification(sorted_vehicles);
 
-    RCLCPP_INFO(m_logger, "detected scenario: %d", scenario);
+    RCLCPP_INFO(m_logger, "Vehicle %d detected scenario: %d", m_owner_vin, scenario);
 
     return Scenario::S2;
 }
@@ -334,11 +343,6 @@ void ScenarioDetector::init_decision_tree()
 
 Scenario ScenarioDetector::decision_tree(const std::vector<mts_msgs::VehicleBaseData>& vehicles) const
 {
-    if (vehicles.empty())
-    {
-        return Scenario::None;
-    }
-
     using Data = std::vector<multi_truck_scenario::msg::VehicleBaseData>;
     return cf::traverse<Data>(m_dtree, vehicles);
 }

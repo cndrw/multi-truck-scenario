@@ -25,7 +25,8 @@ enum class Engine { on, off };
 class Vehicle : public rclcpp::Node
 {
 public:
-    Vehicle(): rclcpp::Node("vehicle")
+    Vehicle()
+        : rclcpp::Node("vehicle"), m_startup_time(std::chrono::milliseconds(700))
     {
         handle_parameters();
         m_scenario_solver.set_owner(m_vin);
@@ -46,10 +47,20 @@ public:
             "solution", 10, std::bind(&Vehicle::solution_callback, this, std::placeholders::_1)
         );
 
-        m_timer = this->create_wall_timer(
-            500ms, std::bind(&Vehicle::update, this)
+        m_vehicle_move_update = this->create_wall_timer(
+            m_vehicle_move_period, std::bind(&Vehicle::move_vehicle, this)
+        );
+
+        m_vehicle_msg_update = this->create_wall_timer(
+            m_msg_send_period, std::bind(&Vehicle::send_vehicle_msg, this)
+        );
+
+        m_start_time = this->get_clock()->now();
+        m_vehicle_update = this->create_wall_timer(
+            m_system_update_period, std::bind(&Vehicle::update, this)
         );
     }
+
     ~Vehicle() {}
 
     bool is_active()
@@ -90,6 +101,12 @@ private:
 
     void update()
     {
+        const auto now = this->get_clock()->now();
+        if ((now - m_start_time) < m_startup_time)
+        {
+            return;
+        }
+
         if (!m_is_active)
         {
             return;
@@ -120,14 +137,16 @@ private:
             m_solution_pub->publish(solution_msg);
         }
 
+        m_nearby_vehicles.clear();
+    }
 
-        move_vehicle();
-
-        m_position.header.stamp = rclcpp::Clock().now();
+    void send_vehicle_msg()
+    {
+        m_position.header.stamp = this->get_clock()->now();
 
         // build the base data package 
         auto vehicle_base_data = mts_msgs::VehicleBaseData();
-        vehicle_base_data.header.stamp = rclcpp::Clock().now();
+        vehicle_base_data.header.stamp = this->get_clock()->now();
         vehicle_base_data.engine_state = static_cast<int>(m_engine_state);
         vehicle_base_data.position = m_position;
         vehicle_base_data.direction = m_direction;
@@ -136,7 +155,6 @@ private:
         vehicle_base_data.indicator_state = static_cast<int>(m_indicator_state);
 
         m_vehicle_pub->publish(vehicle_base_data);
-
     }
 
     void move_vehicle()
@@ -280,7 +298,12 @@ private:
         Indicator m_indicator_state = Indicator::off;
         Engine m_engine_state = Engine::on;
 
-        rclcpp::TimerBase::SharedPtr m_timer;
+        rclcpp::TimerBase::SharedPtr m_vehicle_update;
+        rclcpp::TimerBase::SharedPtr m_vehicle_msg_update;
+        rclcpp::TimerBase::SharedPtr m_vehicle_move_update;
+        const std::chrono::seconds m_system_update_period = 1s;
+        const std::chrono::milliseconds m_msg_send_period = 500ms;
+        const std::chrono::milliseconds m_vehicle_move_period = 300ms;
         std::unordered_map<int, mts_msgs::VehicleBaseData::SharedPtr> m_nearby_vehicles;
         rclcpp::Publisher<mts_msgs::VehicleBaseData>::SharedPtr m_vehicle_pub;
         rclcpp::Subscription<mts_msgs::VehicleBaseData>::SharedPtr m_vehicle_sub;
@@ -291,6 +314,9 @@ private:
 
         ScenarioSolver m_scenario_solver;
         ScenarioDetector m_scenario_detector;
+
+        rclcpp::Time m_start_time;
+        rclcpp::Duration m_startup_time;
 
         // temp
         size_t m_count = 4;

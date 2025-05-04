@@ -76,8 +76,6 @@ class Map : public rclcpp::Node
         m_height = this->get_parameter("height").as_int();
         m_width = this->get_parameter("width").as_int();
 
-        // TODO: set event site data
-        // m_event_sites.push_back() 
         this->declare_parameter<std::vector<int64_t>>("crossing_width_values", {});
         this->declare_parameter<std::vector<int64_t>>("crossing_height_values", {});
         this->declare_parameter<std::vector<int64_t>>("crossing_bot_left_x_values", {});
@@ -223,12 +221,8 @@ class Map : public rclcpp::Node
       grid.info.origin.orientation.z = 0;
       grid.info.origin.orientation.w = 1;
 
-      RCLCPP_INFO(get_logger(), "draw vis1");
-
       add_to_map(m_static_map);
       draw_border();
-
-      RCLCPP_INFO(get_logger(), "draw vis2");
    
       grid.data = m_grid;
     
@@ -297,14 +291,7 @@ class Map : public rclcpp::Node
             return this->calc_distance(s1.second, pos) < this->calc_distance(s2.second, pos);
         });
 
-        if (sites.empty())
-        {
-          response->event_site_id = -1;
-        } 
-        else
-        {
-          response->event_site_id = sites[0].first;
-        }
+        response->event_site_id = sites[0].first;
     }
 
     // calculate the distance from an position to the given event side with an box sdf

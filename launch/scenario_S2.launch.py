@@ -32,7 +32,7 @@ from image2scene import output_final
 def generate_launch_description():
     
     # Define image path using Pathlib
-    image_path = script_dir / 'scenario_S2.png'
+    image_path = script_dir / 'scenario_S2_colored.png'
     # image_path = script_dir / 'big_test.png'
     
     """
@@ -76,7 +76,6 @@ def generate_launch_description():
 
     dir_offset = 5 # offset in degrees
     offset_val_list = [random.uniform(-dir_offset, dir_offset) for i in range(len(vehicles))] # random offset values
-    width_values = [1, 2, 3]
 
     # add small offset to each angle
     # for i, v in enumerate(vehicles):
@@ -115,10 +114,10 @@ def generate_launch_description():
                 'height': result['height'],
                 'width': result['width'],
                 'static_map': result['static_map'],
-                # 'crossing_width_values': width_values,
-                #'crossing_height_values': height_values,
-                #'crossing_bot_left_x_values': bot_left_x_values,
-                #'crossing_bot_left_y_values': bot_left_y_values,
+                'crossing_width_values': width_values,
+                'crossing_height_values': height_values,
+                'crossing_bot_left_x_values': bot_left_x_values,
+                'crossing_bot_left_y_values': bot_left_y_values,
             }],
         ),
         # launch rviz2 for 
