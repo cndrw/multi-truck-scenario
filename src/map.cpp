@@ -304,9 +304,9 @@ class Map : public rclcpp::Node
         float cy = box_pos.y + event_site.height * 0.5f;
 
         // const auto dx = std::max(pos.point.x - box_pos.x, double { 0 });
-        const auto dx = std::fabs(pos.point.x - cx) - event_site.height * 0.5f;
+        const auto dx = std::fabs(pos.point.x - cx) - event_site.width * 0.5f;
         // const auto dy = std::max(pos.point.y - box_pos.y, double { 0 });
-        const auto dy = std::fabs(pos.point.y - cy) - event_site.width * 0.5f;
+        const auto dy = std::fabs(pos.point.y - cy) - event_site.height * 0.5f;
 
         float outside = std::sqrt(std::max(dx, 0.0) * std::max(dx, 0.0) +
                                   std::max(dy, 0.0) * std::max(dy, 0.0));
