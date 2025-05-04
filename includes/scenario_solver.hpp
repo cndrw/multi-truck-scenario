@@ -30,7 +30,8 @@ class ScenarioSolver
 {
 public:
     ScenarioSolver();
-    std::unique_ptr<SolutionType> solve(Scenario scenario, const std::vector<mts_msgs::VehicleBaseData::SharedPtr>& vehicles);
+    std::unique_ptr<SolutionType> solve(Scenario scenario, const std::vector<mts_msgs::VehicleBaseData>& vehicles);
+    // std::unique_ptr<SolutionType> solve(Scenario scenario, const std::vector<mts_msgs::VehicleBaseData::SharedPtr>& vehicles);
     void set_owner(int vin);
 
 private:
@@ -41,14 +42,11 @@ private:
     void solve_s1();
     void solve_s2();
     int solve_uncontrolled_intersection();
-    int get_vehicle(const mts_msgs::VehicleBaseData::SharedPtr vehicle, Side side);
+    int get_vehicle(const mts_msgs::VehicleBaseData& vehicle, Side side);
     bool is_opposite(float alpha, float beta) const;
     void pick_random_vehicle();
 
-    // geometry util functions
-    geometry_msgs::msg::PointStamped substract(const geometry_msgs::msg::PointStamped& p1, const geometry_msgs::msg::PointStamped& p2);
-
-    std::vector<mts_msgs::VehicleBaseData::SharedPtr> m_vehicles;
+    std::vector<mts_msgs::VehicleBaseData> m_vehicles;
     SolutionType m_solution;
     int m_owner_vin;
 };

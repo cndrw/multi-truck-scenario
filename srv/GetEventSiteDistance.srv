@@ -1,0 +1,5 @@
+# GetEventSiteDistancec.srv
+geometry_msgs/PointStamped position
+int64 event_site_id
+---
+float64 distance
