@@ -32,7 +32,8 @@ from image2scene import output_final
 def generate_launch_description():
     
     # Define image path using Pathlib
-    image_path = script_dir / 'scenario_S2.png'
+    image_path = script_dir / 'scenario_S2_colored.png'
+    # image_path = script_dir / 'big_test.png'
     
     """
     Read values from image using the function from image2scene.py
@@ -43,7 +44,6 @@ def generate_launch_description():
     """
     crossing_vals = output_final(str(image_path))
     width_values,height_values,bot_left_x_values,bot_left_y_values = crossing_vals[0],crossing_vals[1],crossing_vals[2],crossing_vals[3]
-
 
     # Generate static map using the function from image_converter.py
     result = generate_rviz_static_map(str(image_path))
@@ -111,13 +111,13 @@ def generate_launch_description():
             ## add parameter for grid data
             ## parameters not yet implemented in map.cpp
             parameters=[{
-                 'height': result['height'],
-                 'width': result['width'],
-                 'static_map': result['static_map'],
-                 'crossing_width_values': width_values,
-                 'crossing_height_values': height_values,
-                 'crossing_bot_left_x_values': bot_left_x_values,
-                 'crossing_bot_left_y_values': bot_left_y_values,
+                'height': result['height'],
+                'width': result['width'],
+                'static_map': result['static_map'],
+                'crossing_width_values': width_values,
+                'crossing_height_values': height_values,
+                'crossing_bot_left_x_values': bot_left_x_values,
+                'crossing_bot_left_y_values': bot_left_y_values,
             }],
         ),
         # launch rviz2 for 

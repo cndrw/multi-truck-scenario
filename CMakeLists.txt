@@ -27,16 +27,25 @@ find_package(visualization_msgs REQUIRED)
 set(msg_files
   "msg/VehicleBaseData.msg"
   "msg/Solution.msg"
+  "msg/EventSiteData.msg"
+)
+
+set(srv_files
+  "srv/GetEventSiteDistance.srv"
+  "srv/GetEventSiteID.srv"
 )
 
 rosidl_generate_interfaces(${PROJECT_NAME}
   ${msg_files}
+  ${srv_files}
   DEPENDENCIES geometry_msgs std_msgs
 )
 
 add_library(scenario_lib
   STATIC src/scenario_solver.cpp
          src/scenario_detector.cpp
+         src/classification.cpp
+         src/tutils.cpp
 ) 
 
 # Ausführbares Ziel

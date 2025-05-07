@@ -14,6 +14,7 @@
 
 #include "scenario_solver.hpp"
 #include "scenario_detector.hpp"
+#include "tutils.h"
 
 using namespace std::chrono_literals;
 namespace mts_msgs = multi_truck_scenario::msg;
@@ -21,17 +22,16 @@ namespace mts_msgs = multi_truck_scenario::msg;
 enum class Indicator { off, left, right, warning };
 enum class Engine { on, off };
 
-static constexpr auto RAD2DEG { 180 / M_PI };
-static constexpr auto DEG2RAD { M_PI / 180 };
-
-
 class Vehicle : public rclcpp::Node
 {
 public:
-    Vehicle(): rclcpp::Node("vehicle")
+    Vehicle()
+        : rclcpp::Node("vehicle"), m_startup_time(std::chrono::milliseconds(700))
     {
         handle_parameters();
         m_scenario_solver.set_owner(m_vin);
+        m_scenario_detector.set_implemenation(1, 0);
+        m_scenario_detector.set_owner(m_vin);
 
         // Publisher der die Daten der Instanz veröffentlicht
         m_vehicle_pub = this->create_publisher<mts_msgs::VehicleBaseData>("vehicle_base_data", 10);
@@ -47,10 +47,20 @@ public:
             "solution", 10, std::bind(&Vehicle::solution_callback, this, std::placeholders::_1)
         );
 
-        m_timer = this->create_wall_timer(
-            500ms, std::bind(&Vehicle::update, this)
+        m_vehicle_move_update = this->create_wall_timer(
+            m_vehicle_move_period, std::bind(&Vehicle::move_vehicle, this)
+        );
+
+        m_vehicle_msg_update = this->create_wall_timer(
+            m_msg_send_period, std::bind(&Vehicle::send_vehicle_msg, this)
+        );
+
+        m_start_time = this->get_clock()->now();
+        m_vehicle_update = this->create_wall_timer(
+            m_system_update_period, std::bind(&Vehicle::update, this)
         );
     }
+
     ~Vehicle() {}
 
     bool is_active()
@@ -86,22 +96,58 @@ private:
         m_indicator_state = (Indicator)this->get_parameter("indicator_state").as_int();
         m_engine_state = (Engine)this->get_parameter("engine_state").as_int();
 
-        RCLCPP_INFO(get_logger(), "detector: %d", this->get_parameter("scenario_detector").as_int());
+        // RCLCPP_INFO(get_logger(), "detector: %d", this->get_parameter("scenario_detector").as_int());
     }
 
     void update()
     {
+        const auto now = this->get_clock()->now();
+        if ((now - m_start_time) < m_startup_time)
+        {
+            return;
+        }
+
         if (!m_is_active)
         {
             return;
         }
 
-        move_vehicle();
 
-        m_position.header.stamp = rclcpp::Clock().now();
+        std::vector<mts_msgs::VehicleBaseData> tmp;
+        tmp.reserve(m_nearby_vehicles.size());
+        for (auto& v : m_nearby_vehicles)
+        {
+            tmp.push_back(*v.second);
+        }
+
+        if (tmp.size() != 0)
+        {
+            Scenario scenario = m_scenario_detector.check(tmp);
+            RCLCPP_INFO(get_logger(), "start solution of %d", scenario);
+            const auto solution = m_scenario_solver.solve(scenario, tmp);
+
+            if (solution == nullptr)
+            {
+                RCLCPP_INFO(this->get_logger(), "solution not valid");
+                return;
+            }
+
+            auto solution_msg = mts_msgs::Solution();
+            solution_msg.author_vin = m_vin;
+            solution_msg.winner_vin = solution->winner_vin;
+            m_solution_pub->publish(solution_msg);
+        }
+
+        m_nearby_vehicles.clear();
+    }
+
+    void send_vehicle_msg()
+    {
+        m_position.header.stamp = this->get_clock()->now();
+
         // build the base data package 
         auto vehicle_base_data = mts_msgs::VehicleBaseData();
-        vehicle_base_data.header.stamp = rclcpp::Clock().now();
+        vehicle_base_data.header.stamp = this->get_clock()->now();
         vehicle_base_data.engine_state = static_cast<int>(m_engine_state);
         vehicle_base_data.position = m_position;
         vehicle_base_data.direction = m_direction;
@@ -119,8 +165,8 @@ private:
         const auto delta_time = now_time - last_time;
 
         // get driving direction
-        const double dy = std::sin(m_direction * DEG2RAD);
-        const double dx = std::cos(m_direction * DEG2RAD);
+        const double dy = std::sin(m_direction * tutils::DEG2RAD);
+        const double dx = std::cos(m_direction * tutils::DEG2RAD);
 
         const double delta_move = m_speed * delta_time.seconds();
         m_position.point.x += delta_move * dx;
@@ -168,32 +214,9 @@ private:
 
         // Handle the received message
         const auto key = vehicle_data->vin;
-        if (m_vehicles.count(key) == 0) 
+        if (m_nearby_vehicles.count(key) == 0) 
         {
-            m_vehicles.emplace(key, vehicle_data);
-            if (m_vehicles.size() == m_count)
-            {
-                // get the list of vehicles from the map
-                std::vector<mts_msgs::VehicleBaseData::SharedPtr> vehicles;
-                vehicles.reserve(m_vehicles.size());
-                for (const auto v : m_vehicles)
-                {
-                    vehicles.push_back(v.second);
-                }
-
-                const auto solution = m_scenario_solver.solve(Scenario::S2, vehicles);
-                if (solution != nullptr)
-                {
-                    auto solution_msg = mts_msgs::Solution();
-                    solution_msg.author_vin = m_vin;
-                    solution_msg.winner_vin = solution->winner_vin;
-                    m_solution_pub->publish(solution_msg);
-                }
-                else
-                {
-                    RCLCPP_INFO(this->get_logger(), "solution not valid");
-                }
-            }
+            m_nearby_vehicles.emplace(key, vehicle_data);
         }
     }
 
@@ -225,9 +248,9 @@ private:
 
         m_solution_vins.push_back(solution->winner_vin);
 
-        if (m_vehicles.size() == 4)
+        if (m_nearby_vehicles.size() == 4)
         {
-            m_vehicles.clear();
+            m_nearby_vehicles.clear();
             m_solution_vins.clear();
             m_count--;
             m_solution_delay = this->get_clock()->now().seconds() + m_delay_time;
@@ -241,7 +264,7 @@ private:
            return; 
         }
 
-        if (m_solution_vins.size() < m_vehicles.size())
+        if (m_solution_vins.size() < m_nearby_vehicles.size())
         {
             return;
         }
@@ -253,7 +276,7 @@ private:
 
         if (all_equal)
         {
-            m_vehicles.clear();
+            m_nearby_vehicles.clear();
             m_solution_vins.clear();
             m_count--;
             m_solution_delay = this->get_clock()->now().seconds() + m_delay_time;
@@ -276,9 +299,13 @@ private:
         Indicator m_indicator_state = Indicator::off;
         Engine m_engine_state = Engine::on;
 
-        rclcpp::TimerBase::SharedPtr m_timer;
-        std::unordered_map<int, mts_msgs::VehicleBaseData::SharedPtr> m_vehicles;
-
+        rclcpp::TimerBase::SharedPtr m_vehicle_update;
+        rclcpp::TimerBase::SharedPtr m_vehicle_msg_update;
+        rclcpp::TimerBase::SharedPtr m_vehicle_move_update;
+        const std::chrono::seconds m_system_update_period = 1s;
+        const std::chrono::milliseconds m_msg_send_period = 500ms;
+        const std::chrono::milliseconds m_vehicle_move_period = 300ms;
+        std::unordered_map<int, mts_msgs::VehicleBaseData::SharedPtr> m_nearby_vehicles;
         rclcpp::Publisher<mts_msgs::VehicleBaseData>::SharedPtr m_vehicle_pub;
         rclcpp::Subscription<mts_msgs::VehicleBaseData>::SharedPtr m_vehicle_sub;
 
@@ -287,6 +314,10 @@ private:
         std::vector<int> m_solution_vins;
 
         ScenarioSolver m_scenario_solver;
+        ScenarioDetector m_scenario_detector;
+
+        rclcpp::Time m_start_time;
+        rclcpp::Duration m_startup_time;
 
         // temp
         size_t m_count = 4;

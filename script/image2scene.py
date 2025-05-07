@@ -198,8 +198,8 @@ def exec_script(image_path):
     # shall return list of tuples with all crossings
     # use code that works in main() method
     
-    # img = Image.open(image_path)
-    img = image_path
+    img = Image.open(image_path)
+    # img = image_path
 
     yellow_pixels = find_yellow_pixels(img)
     rectangles = find_rectangle_crossings(yellow_pixels)
