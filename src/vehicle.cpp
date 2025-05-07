@@ -130,8 +130,13 @@ private:
         if (tmp.size() != 0)
         {
             const auto res = m_scenario_detector.check(tmp);
-            m_proposal_vehicles = res.second;
-            send_scenario_proposal(res.first);
+            for (const auto& v : res.second)
+            {
+                m_proposal_vehicles.emplace(v.vin, v);
+            }
+
+            m_detected_scenario = res.first;
+            send_scenario_proposal(m_detected_scenario);
         }
 
         m_nearby_vehicles.clear();
@@ -244,20 +249,52 @@ private:
     }
 
     void scenario_proposal_callback(const mts_msgs::DetectionProposal::SharedPtr proposal)
-    {
-        // const auto solution = m_scenario_solver.solve(scenario, tmp);
+    {    
+        if (m_proposal_vehicles.count(proposal->owner_vin) == 0)
+        {
+            return;
+        }
 
-        // if (solution == nullptr)
-        // {
-        //     RCLCPP_INFO(this->get_logger(), "solution not valid");
-        //     return;
-        // }
+        m_proposal_buffer.push_back(*proposal);
 
-        // auto solution_msg = mts_msgs::Solution();
-        // solution_msg.author_vin = m_vin;
-        // solution_msg.winner_vin = solution->winner_vin;
-        // m_solution_pub->publish(solution_msg);
+        if (m_proposal_buffer.size() == m_proposal_vehicles.size())
+        {
+            bool all_equal = std::all_of(m_proposal_buffer.begin(), m_proposal_buffer.end(), [this](const mts_msgs::DetectionProposal& p) {
+                return p.scenario == (int)this->m_detected_scenario;
+            });
 
+            if(all_equal)
+            {
+                solve_scenario();
+            }
+            else RCLCPP_INFO(get_logger(), "not all same (%d)", m_vin);
+
+            m_detected_scenario = Scenario::None;
+            m_proposal_buffer.clear();
+            // m_proposal_vehicles.clear();
+        }
+    }
+
+    void solve_scenario()
+    {        
+        std::vector<mts_msgs::VehicleBaseData> tmp;
+        tmp.reserve(m_proposal_vehicles.size());
+        for (auto& v : m_proposal_vehicles)
+        {
+            tmp.push_back(v.second);
+        }
+
+        const auto solution = m_scenario_solver.solve(m_detected_scenario, tmp);
+        if (solution == nullptr)
+        {
+            RCLCPP_INFO(this->get_logger(), "(%d) solution not valid", m_vin);
+            return;
+        }
+
+        auto solution_msg = mts_msgs::Solution();
+        solution_msg.author_vin = m_vin;
+        solution_msg.winner_vin = solution->winner_vin;
+        m_solution_pub->publish(solution_msg);
     }
 
     void solution_callback(const mts_msgs::Solution::SharedPtr solution)
@@ -267,48 +304,79 @@ private:
             return;
         }
 
-        m_solution_vins.push_back(solution->winner_vin);
-
-        if (m_nearby_vehicles.size() == 4)
-        {
-            m_nearby_vehicles.clear();
-            m_solution_vins.clear();
-            m_count--;
-            m_solution_delay = this->get_clock()->now().seconds() + m_delay_time;
-
-            if (solution->winner_vin == m_vin)
-            {
-                RCLCPP_INFO(this->get_logger(), "kill %d", m_vin);
-                // m_is_active = false;
-                m_speed = 1.0;
-            }
-           return; 
-        }
-
-        if (m_solution_vins.size() < m_nearby_vehicles.size())
+        if (m_proposal_vehicles.count(solution->author_vin) == 0)
         {
             return;
         }
 
-        // check if all vins are the same
-        bool all_equal = std::all_of(m_solution_vins.begin(), m_solution_vins.end(), [this](int vin) {
-            return vin == this->m_solution_vins[0];
-        });
+        RCLCPP_INFO(get_logger(), "got %d from %d", solution->winner_vin, solution->author_vin);
+        m_solution_buffer.push_back(*solution);
 
-        if (all_equal)
+        if (m_solution_buffer.size() == m_proposal_vehicles.size())
         {
-            m_nearby_vehicles.clear();
-            m_solution_vins.clear();
-            m_count--;
             m_solution_delay = this->get_clock()->now().seconds() + m_delay_time;
 
-            if (solution->winner_vin == m_vin)
+            // check if all vins are the same
+            int comp_vin = m_solution_buffer[0].winner_vin;
+            bool all_equal = std::all_of(m_solution_buffer.begin(), m_solution_buffer.end(), [this, comp_vin](const mts_msgs::Solution s) {
+                RCLCPP_INFO(this->get_logger(), "(%d) It: %d, comp: %d", this->m_vin, s.winner_vin, comp_vin);
+                return s.winner_vin == comp_vin;
+            });
+
+            if (all_equal && solution->winner_vin == m_vin)
             {
                 RCLCPP_INFO(this->get_logger(), "kill %d", m_vin);
-                // m_is_active = false;
                 m_speed = 1.0;
+                // grant driving permission 
             }
+
+            m_nearby_vehicles.clear();
+            m_solution_buffer.clear();
+            m_proposal_vehicles.clear();
         }
+
+        // m_solution_vins.push_back(solution->winner_vin);
+
+        // if (m_nearby_vehicles.size() == 4)
+        // {
+        //     m_nearby_vehicles.clear();
+        //     m_solution_vins.clear();
+        //     m_count--;
+        //     m_solution_delay = this->get_clock()->now().seconds() + m_delay_time;
+
+        //     if (solution->winner_vin == m_vin)
+        //     {
+        //         RCLCPP_INFO(this->get_logger(), "kill %d", m_vin);
+        //         // m_is_active = false;
+        //         m_speed = 1.0;
+        //     }
+        //    return; 
+        // }
+
+        // if (m_solution_vins.size() < m_nearby_vehicles.size())
+        // {
+        //     return;
+        // }
+
+        // // check if all vins are the same
+        // bool all_equal = std::all_of(m_solution_vins.begin(), m_solution_vins.end(), [this](int vin) {
+        //     return vin == this->m_solution_vins[0];
+        // });
+
+        // if (all_equal)
+        // {
+        //     m_nearby_vehicles.clear();
+        //     m_solution_vins.clear();
+        //     m_count--;
+        //     m_solution_delay = this->get_clock()->now().seconds() + m_delay_time;
+
+        //     if (solution->winner_vin == m_vin)
+        //     {
+        //         RCLCPP_INFO(this->get_logger(), "kill %d", m_vin);
+        //         // m_is_active = false;
+        //         m_speed = 1.0;
+        //     }
+        // }
     }
 
         bool m_is_active = true;
@@ -330,10 +398,14 @@ private:
         rclcpp::Publisher<mts_msgs::VehicleBaseData>::SharedPtr m_vehicle_pub;
         rclcpp::Subscription<mts_msgs::VehicleBaseData>::SharedPtr m_vehicle_sub;
 
-        std::vector<mts_msgs::VehicleBaseData> m_proposal_vehicles;
+        Scenario m_detected_scenario;
+        std::unordered_map<int, mts_msgs::VehicleBaseData> m_proposal_vehicles;
+        std::vector<mts_msgs::DetectionProposal> m_proposal_buffer;
         rclcpp::Publisher<mts_msgs::DetectionProposal>::SharedPtr m_dproposal_pub;
         rclcpp::Subscription<mts_msgs::DetectionProposal>::SharedPtr m_dproposal_sub;
 
+
+        std::vector<mts_msgs::Solution> m_solution_buffer;
         rclcpp::Publisher<mts_msgs::Solution>::SharedPtr m_solution_pub;
         rclcpp::Subscription<mts_msgs::Solution>::SharedPtr m_solution_sub;
         std::vector<int> m_solution_vins;

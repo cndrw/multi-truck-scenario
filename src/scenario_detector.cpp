@@ -338,7 +338,6 @@ Scenario ScenarioDetector::scenario_classification(const DecisionData& data)
 void ScenarioDetector::init_decision_tree()
 {
     m_dtree = std::make_shared<cf::TreeNode<DecisionData>>([this](const DecisionData& data) {
-        RCLCPP_INFO(m_logger, "num_streets: %d", data.second.num_streets);
         return data.second.num_streets > 2;
     });
 
@@ -346,7 +345,6 @@ void ScenarioDetector::init_decision_tree()
 
     m_dtree->yes = std::make_shared<cf::TreeNode<DecisionData>>([this](const DecisionData& data){
         // temporary decision between S1 & S2 until the width of the streets is present
-        RCLCPP_INFO(m_logger, "num vehicles: %d", data.first.size());
         return data.first.size() > 2;
     });
 
