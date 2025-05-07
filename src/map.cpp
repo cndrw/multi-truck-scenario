@@ -80,19 +80,19 @@ class Map : public rclcpp::Node
         this->declare_parameter<std::vector<int64_t>>("crossing_height_values", {});
         this->declare_parameter<std::vector<int64_t>>("crossing_bot_left_x_values", {});
         this->declare_parameter<std::vector<int64_t>>("crossing_bot_left_y_values", {});
-        this->declare_parameter("street_width_left", 0);
-        this->declare_parameter("street_width_right", 0);
-        this->declare_parameter("street_width_top", 0);
-        this->declare_parameter("street_width_bottom", 0);
+        this->declare_parameter<std::vector<int64_t>>("street_width_left", {});
+        this->declare_parameter<std::vector<int64_t>>("street_width_right", {});
+        this->declare_parameter<std::vector<int64_t>>("street_width_top", {});
+        this->declare_parameter<std::vector<int64_t>>("street_width_bottom", {});
 
         const auto width_values = this->get_parameter("crossing_width_values").as_integer_array();
         const auto height_values = this->get_parameter("crossing_height_values").as_integer_array();
         const auto bot_left_x_values = this->get_parameter("crossing_bot_left_x_values").as_integer_array();
         const auto bot_left_y_values = this->get_parameter("crossing_bot_left_y_values").as_integer_array();
-        const auto street_width_left = this->get_parameter("street_width_left").as_int();
-        const auto street_width_right = this->get_parameter("street_width_right").as_int();
-        const auto street_width_top = this->get_parameter("street_width_top").as_int();
-        const auto street_width_bottom = this->get_parameter("street_width_bottom").as_int();
+        const auto street_width_left = this->get_parameter("street_width_left").as_integer_array();
+        const auto street_width_right = this->get_parameter("street_width_right").as_integer_array();
+        const auto street_width_top = this->get_parameter("street_width_top").as_integer_array();
+        const auto street_width_bottom = this->get_parameter("street_width_bottom").as_integer_array();
 
         // Set content of struct Street
         size_t num_streets = street_width_left.size();
