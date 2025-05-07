@@ -80,12 +80,31 @@ class Map : public rclcpp::Node
         this->declare_parameter<std::vector<int64_t>>("crossing_height_values", {});
         this->declare_parameter<std::vector<int64_t>>("crossing_bot_left_x_values", {});
         this->declare_parameter<std::vector<int64_t>>("crossing_bot_left_y_values", {});
+        this->declare_parameter("street_width_left", 0);
+        this->declare_parameter("street_width_right", 0);
+        this->declare_parameter("street_width_top", 0);
+        this->declare_parameter("street_width_bottom", 0);
 
         const auto width_values = this->get_parameter("crossing_width_values").as_integer_array();
         const auto height_values = this->get_parameter("crossing_height_values").as_integer_array();
         const auto bot_left_x_values = this->get_parameter("crossing_bot_left_x_values").as_integer_array();
         const auto bot_left_y_values = this->get_parameter("crossing_bot_left_y_values").as_integer_array();
-        
+        const auto street_width_left = this->get_parameter("street_width_left").as_int();
+        const auto street_width_right = this->get_parameter("street_width_right").as_int();
+        const auto street_width_top = this->get_parameter("street_width_top").as_int();
+        const auto street_width_bottom = this->get_parameter("street_width_bottom").as_int();
+
+        // Set content of struct Street
+        size_t num_streets = street_width_left.size();
+        if (street_width_right.size() != num_streets ||
+            street_width_top.size() != num_streets ||
+            street_width_bottom.size() != num_streets) 
+        {
+            RCLCPP_ERROR(this->get_logger(), "Mismatch in size of street parameter arrays!");
+            return;
+        }
+
+        // Set content of struct EventSite
         size_t num_sites = width_values.size();
         if (height_values.size() != num_sites || 
         bot_left_x_values.size() != num_sites || 
@@ -102,6 +121,11 @@ class Map : public rclcpp::Node
             site.position.x = bot_left_x_values[i];
             site.position.y = bot_left_y_values[i];
             site.position.z = 0.0; // Assuming z is always 0 for the event site
+            site.streets.resize(4); // Assuming 4 streets for each event site
+            site.streets[0].width = street_width_left[i]; // Left street
+            site.streets[1].width = street_width_right[i]; // Right street
+            site.streets[2].width = street_width_top[i]; // Top street
+            site.streets[3].width = street_width_bottom[i]; // Bottom street
             m_event_sites.emplace(i, site);
         }
     }
