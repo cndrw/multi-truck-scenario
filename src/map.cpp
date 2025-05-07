@@ -120,17 +120,13 @@ class Map : public rclcpp::Node
             site.height = height_values[i];
             site.position.x = bot_left_x_values[i];
             site.position.y = bot_left_y_values[i];
-            /* Before, did not compile:
-            site.streets.push_back(street_width_left[i]);
-            site.streets.push_back(street_width_right[i]);
-            site.streets.push_back(street_width_top[i]);
-            site.streets.push_back(street_width_bottom[i]);*/
             site.position.z = 0.0; // Assuming z is always 0 for the event site
-            site.streets.resize(4); // Assuming 4 streets for each event site
-            site.streets.push_back(Street{static_cast<int>(street_width_left[i])});   // Left
-            site.streets.push_back(Street{static_cast<int>(street_width_right[i])});  // Right
-            site.streets.push_back(Street{static_cast<int>(street_width_top[i])});    // Top
-            site.streets.push_back(Street{static_cast<int>(street_width_bottom[i])}); // Bottom
+            site.streets = { // Assuming 4 streets for each event site
+              Street{static_cast<int>(street_width_left[i])},
+              Street{static_cast<int>(street_width_right[i])},
+              Street{static_cast<int>(street_width_top[i])},
+              Street{static_cast<int>(street_width_bottom[i])}
+            };
             m_event_sites.emplace(i, site);
             RCLCPP_INFO(this->get_logger(), 
                 "EventSite %zu: pos=(%.1f, %.1f), size=(%d x %d), Streets [L=%d, R=%d, T=%d, B=%d]", 
