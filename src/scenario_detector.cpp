@@ -43,9 +43,10 @@ ScenarioDetector::ScenarioDetector() : m_logger(rclcpp::get_logger("detector"))
     init_decision_tree();
 }
 
-Scenario ScenarioDetector::check(const std::vector<mts_msgs::VehicleBaseData>& vehicles)
+std::pair<Scenario, std::vector<mts_msgs::VehicleBaseData>>
+ScenarioDetector::check(const std::vector<mts_msgs::VehicleBaseData>& vehicles)
 {
-    return impl[m_implementation](vehicles);
+    return {impl[m_implementation](vehicles), m_vehicles};
 }
 
 Scenario ScenarioDetector::check_1([[maybe_unused]] const std::vector<mts_msgs::VehicleBaseData>& vehicles)
@@ -102,6 +103,7 @@ ScenarioDetector::apply_fuzzy_logic(const std::vector<mts_msgs::VehicleBaseData>
 
 Scenario ScenarioDetector::check_2(const std::vector<mts_msgs::VehicleBaseData>& vehicles)
 {
+    m_vehicles.clear();
     std::vector<mts_msgs::VehicleBaseData>  invoveld_vehicles;
 
     // get nearest event site to owner vin
@@ -141,6 +143,7 @@ Scenario ScenarioDetector::check_2(const std::vector<mts_msgs::VehicleBaseData>&
 
     auto sorted_vehicles = get_sorted_vehicles(invoveld_vehicles, site_id);
     auto scenario = scenario_classification({sorted_vehicles, site_data});
+    m_vehicles = sorted_vehicles;
 
     RCLCPP_INFO(m_logger, "Vehicle %d detected scenario: %d", m_owner_vin, scenario);
 

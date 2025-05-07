@@ -11,6 +11,7 @@
 #include "geometry_msgs/msg/point_stamped.hpp"
 #include "multi_truck_scenario/msg/vehicle_base_data.hpp"
 #include "multi_truck_scenario/msg/solution.hpp"
+#include "multi_truck_scenario/msg/detection_proposal.hpp"
 
 #include "scenario_solver.hpp"
 #include "scenario_detector.hpp"
@@ -53,6 +54,12 @@ public:
 
         m_vehicle_msg_update = this->create_wall_timer(
             m_msg_send_period, std::bind(&Vehicle::send_vehicle_msg, this)
+        );
+
+        m_dproposal_pub = this->create_publisher<mts_msgs::DetectionProposal>("scenario_proposal", 10);
+
+        m_dproposal_sub = this->create_subscription<mts_msgs::DetectionProposal>(
+            "scenario_proposal", 10, std::bind(&Vehicle::scenario_proposal_callback, this, std::placeholders::_1)
         );
 
         m_start_time = this->get_clock()->now();
@@ -122,20 +129,9 @@ private:
 
         if (tmp.size() != 0)
         {
-            Scenario scenario = m_scenario_detector.check(tmp);
-            RCLCPP_INFO(get_logger(), "start solution of %d", scenario);
-            const auto solution = m_scenario_solver.solve(scenario, tmp);
-
-            if (solution == nullptr)
-            {
-                RCLCPP_INFO(this->get_logger(), "solution not valid");
-                return;
-            }
-
-            auto solution_msg = mts_msgs::Solution();
-            solution_msg.author_vin = m_vin;
-            solution_msg.winner_vin = solution->winner_vin;
-            m_solution_pub->publish(solution_msg);
+            const auto res = m_scenario_detector.check(tmp);
+            m_proposal_vehicles = res.second;
+            send_scenario_proposal(res.first);
         }
 
         m_nearby_vehicles.clear();
@@ -239,6 +235,31 @@ private:
         return true;
     }
 
+    void send_scenario_proposal(const Scenario scenario)
+    {
+        auto proposal = mts_msgs::DetectionProposal();
+        proposal.owner_vin = m_vin;
+        proposal.scenario = (int8_t)scenario;
+        m_dproposal_pub->publish(proposal);
+    }
+
+    void scenario_proposal_callback(const mts_msgs::DetectionProposal::SharedPtr proposal)
+    {
+        // const auto solution = m_scenario_solver.solve(scenario, tmp);
+
+        // if (solution == nullptr)
+        // {
+        //     RCLCPP_INFO(this->get_logger(), "solution not valid");
+        //     return;
+        // }
+
+        // auto solution_msg = mts_msgs::Solution();
+        // solution_msg.author_vin = m_vin;
+        // solution_msg.winner_vin = solution->winner_vin;
+        // m_solution_pub->publish(solution_msg);
+
+    }
+
     void solution_callback(const mts_msgs::Solution::SharedPtr solution)
     {
         if(!m_is_active)
@@ -308,6 +329,10 @@ private:
         std::unordered_map<int, mts_msgs::VehicleBaseData::SharedPtr> m_nearby_vehicles;
         rclcpp::Publisher<mts_msgs::VehicleBaseData>::SharedPtr m_vehicle_pub;
         rclcpp::Subscription<mts_msgs::VehicleBaseData>::SharedPtr m_vehicle_sub;
+
+        std::vector<mts_msgs::VehicleBaseData> m_proposal_vehicles;
+        rclcpp::Publisher<mts_msgs::DetectionProposal>::SharedPtr m_dproposal_pub;
+        rclcpp::Subscription<mts_msgs::DetectionProposal>::SharedPtr m_dproposal_sub;
 
         rclcpp::Publisher<mts_msgs::Solution>::SharedPtr m_solution_pub;
         rclcpp::Subscription<mts_msgs::Solution>::SharedPtr m_solution_sub;
