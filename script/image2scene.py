@@ -247,7 +247,21 @@ def output_event_streets(image_path):
     rectangles = find_rectangle_crossings(yellow_pixels)
     valid_crossings = [rect for rect in rectangles if is_rectangle_valid_crossing(rect, img)]
 
-    return [output_values_streets(crossing, img) for crossing in valid_crossings]
+    # make lists like for events
+    width_values_left_streets = []
+    width_values_right_streets = []
+    width_values_top_streets = []
+    width_values_bottom_streets = []
+    # iterate over all events and append values to the lists
+    for crossing in valid_crossings:
+        left, right, top, bottom = output_values_streets(crossing, img)
+        width_values_left_streets.append(left)
+        width_values_right_streets.append(right)
+        width_values_top_streets.append(top)
+        width_values_bottom_streets.append(bottom)
+
+    # return [output_values_streets(crossing, img) for crossing in valid_crossings]
+    return [width_values_left_streets, width_values_right_streets, width_values_top_streets, width_values_bottom_streets]
 
 def main():
     # Argument parser for command line input
@@ -276,10 +290,13 @@ def main():
         print(f"Crossing {i+1}: {rect}")
 
     # print(output_values(valid_crossings[]))  # Example output for the first valid crossing
-    print(exec_script(img))  # Example output for the first valid crossing
     print(output_values_streets(valid_crossings[0], img))  # Example output for the first valid crossing
     print(output_values_streets(valid_crossings[1], img))  # Example output for the first valid crossing
     print(output_values_streets(valid_crossings[2], img))  # Example output for the first valid crossing
+    print(exec_script(img))  # Example output for the first valid crossing
+    print(output_event(img))  # Example output for the first valid crossing
+    print(output_event_streets(img))  # Example output for the first valid crossing
+
 
 if __name__ == "__main__":
     main()
