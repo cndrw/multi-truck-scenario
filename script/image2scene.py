@@ -5,6 +5,7 @@ from itertools import combinations
 
 # checks every pixel if yellow
 def find_yellow_pixels(img):
+
     pixels = img.load()
     width, height = img.size
     yellow = (255, 255, 0)
@@ -202,8 +203,8 @@ def exec_script(image_path):
     # shall return list of tuples with all crossings
     # use code that works in main() method
     
-    # img = Image.open(image_path)
-    img = image_path
+    img = Image.open(image_path)
+    # img = image_path
 
     yellow_pixels = find_yellow_pixels(img)
     rectangles = find_rectangle_crossings(yellow_pixels)
@@ -241,7 +242,8 @@ def output_event(image_path):
     return output_lists(exec_script(image_path))
 
 def output_event_streets(image_path):
-    img = image_path
+    img = Image.open(image_path)
+    # img = image_path
 
     yellow_pixels = find_yellow_pixels(img)
     rectangles = find_rectangle_crossings(yellow_pixels)
