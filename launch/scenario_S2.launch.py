@@ -26,7 +26,7 @@ script_dir = Path(__file__).resolve().parent.parent / 'script'
 sys.path.insert(0, str(script_dir))
 # Import the function that generates the RViz-compatible grid data
 from image2grid_converter import generate_rviz_static_map
-from image2scene import output_final
+from image2scene import output_event, output_event_streets
 ## --------------------------------------------------------------------------------
 
 def generate_launch_description():
@@ -42,9 +42,10 @@ def generate_launch_description():
     in cpp code then:
     split crossing vals into n tuples, that can be used to parametrize the map node 
     """
-    crossing_vals = output_final(str(image_path))
+    crossing_vals = output_event(str(image_path))
+    street_vals = output_event_streets(str(image_path))
     width_values,height_values,bot_left_x_values,bot_left_y_values = crossing_vals[0],crossing_vals[1],crossing_vals[2],crossing_vals[3]
-
+    width_street_left, width_street_right, width_street_top, width_street_bottom = street_vals[0],street_vals[1],street_vals[2],street_vals[3]
     # Generate static map using the function from image_converter.py
     result = generate_rviz_static_map(str(image_path))
     # static_map = result['static_map']
@@ -118,6 +119,11 @@ def generate_launch_description():
                 'crossing_height_values': height_values,
                 'crossing_bot_left_x_values': bot_left_x_values,
                 'crossing_bot_left_y_values': bot_left_y_values,
+                'street_width_left': width_street_left,
+                'street_width_right': width_street_right,
+                'street_width_top': width_street_top,
+                'street_width_bottom': width_street_bottom,
+
             }],
         ),
         # launch rviz2 for 
