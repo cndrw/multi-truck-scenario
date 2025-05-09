@@ -102,8 +102,6 @@ private:
         m_speed = this->get_parameter("speed").as_double();
         m_indicator_state = (Indicator)this->get_parameter("indicator_state").as_int();
         m_engine_state = (Engine)this->get_parameter("engine_state").as_int();
-
-        // RCLCPP_INFO(get_logger(), "detector: %d", this->get_parameter("scenario_detector").as_int());
     }
 
     void update()
@@ -172,8 +170,6 @@ private:
         const double delta_move = m_speed * delta_time.seconds();
         m_position.point.x += delta_move * dx;
         m_position.point.y += delta_move * dy;
-
-        // RCLCPP_INFO(get_logger(), "pos.x: %f, pos.y: %f,  dx: %f, move: %f", m_position.point.x, m_position.point.y, dx, dx * delta_move);
 
         last_time = now_time;
     }
@@ -267,7 +263,7 @@ private:
             {
                 solve_scenario();
             }
-            else RCLCPP_INFO(get_logger(), "not all same (%d)", m_vin);
+            else RCLCPP_INFO(get_logger(), "Not all scenario proposals are equal", m_vin);
 
             m_detected_scenario = Scenario::None;
             m_proposal_buffer.clear();
@@ -309,117 +305,86 @@ private:
             return;
         }
 
-        RCLCPP_INFO(get_logger(), "got %d from %d", solution->winner_vin, solution->author_vin);
         m_solution_buffer.push_back(*solution);
 
         if (m_solution_buffer.size() == m_proposal_vehicles.size())
         {
             m_solution_delay = this->get_clock()->now().seconds() + m_delay_time;
 
-            // check if all vins are the same
-            int comp_vin = m_solution_buffer[0].winner_vin;
-            bool all_equal = std::all_of(m_solution_buffer.begin(), m_solution_buffer.end(), [this, comp_vin](const mts_msgs::Solution s) {
-                RCLCPP_INFO(this->get_logger(), "(%d) It: %d, comp: %d", this->m_vin, s.winner_vin, comp_vin);
-                return s.winner_vin == comp_vin;
-            });
-
-            if (all_equal && solution->winner_vin == m_vin)
+            if (compare_solutions(m_solution_buffer) && solution->winner_vin == m_vin)
             {
-                RCLCPP_INFO(this->get_logger(), "kill %d", m_vin);
-                m_speed = 1.0;
+                RCLCPP_INFO(this->get_logger(), "Vehicle %d obtained driving permission", m_vin);
                 // grant driving permission 
+                m_speed = 1.0;
             }
 
             m_nearby_vehicles.clear();
             m_solution_buffer.clear();
             m_proposal_vehicles.clear();
         }
-
-        // m_solution_vins.push_back(solution->winner_vin);
-
-        // if (m_nearby_vehicles.size() == 4)
-        // {
-        //     m_nearby_vehicles.clear();
-        //     m_solution_vins.clear();
-        //     m_count--;
-        //     m_solution_delay = this->get_clock()->now().seconds() + m_delay_time;
-
-        //     if (solution->winner_vin == m_vin)
-        //     {
-        //         RCLCPP_INFO(this->get_logger(), "kill %d", m_vin);
-        //         // m_is_active = false;
-        //         m_speed = 1.0;
-        //     }
-        //    return; 
-        // }
-
-        // if (m_solution_vins.size() < m_nearby_vehicles.size())
-        // {
-        //     return;
-        // }
-
-        // // check if all vins are the same
-        // bool all_equal = std::all_of(m_solution_vins.begin(), m_solution_vins.end(), [this](int vin) {
-        //     return vin == this->m_solution_vins[0];
-        // });
-
-        // if (all_equal)
-        // {
-        //     m_nearby_vehicles.clear();
-        //     m_solution_vins.clear();
-        //     m_count--;
-        //     m_solution_delay = this->get_clock()->now().seconds() + m_delay_time;
-
-        //     if (solution->winner_vin == m_vin)
-        //     {
-        //         RCLCPP_INFO(this->get_logger(), "kill %d", m_vin);
-        //         // m_is_active = false;
-        //         m_speed = 1.0;
-        //     }
-        // }
     }
 
-        bool m_is_active = true;
-        // base package informations
-        double m_speed;
-        double m_direction;
-        int m_vin;
-        geometry_msgs::msg::PointStamped m_position;
-        Indicator m_indicator_state = Indicator::off;
-        Engine m_engine_state = Engine::on;
+    bool compare_solutions(const std::vector<mts_msgs::Solution>& solutions)
+    {
+        const auto it = std::find_if(solutions.begin(), solutions.end(), [](const mts_msgs::Solution& s) {
+            return s.winner_vin != VinFlags::Ignored;
+        });
 
-        rclcpp::TimerBase::SharedPtr m_vehicle_update;
-        rclcpp::TimerBase::SharedPtr m_vehicle_msg_update;
-        rclcpp::TimerBase::SharedPtr m_vehicle_move_update;
-        const std::chrono::seconds m_system_update_period = 1s;
-        const std::chrono::milliseconds m_msg_send_period = 500ms;
-        const std::chrono::milliseconds m_vehicle_move_period = 300ms;
-        std::unordered_map<int, mts_msgs::VehicleBaseData::SharedPtr> m_nearby_vehicles;
-        rclcpp::Publisher<mts_msgs::VehicleBaseData>::SharedPtr m_vehicle_pub;
-        rclcpp::Subscription<mts_msgs::VehicleBaseData>::SharedPtr m_vehicle_sub;
+        // every vin is "ignored" -> no solution possible
+        if (it == solutions.end())
+        {
+            return false;
+        }
 
-        Scenario m_detected_scenario;
-        std::unordered_map<int, mts_msgs::VehicleBaseData> m_proposal_vehicles;
-        std::vector<mts_msgs::DetectionProposal> m_proposal_buffer;
-        rclcpp::Publisher<mts_msgs::DetectionProposal>::SharedPtr m_dproposal_pub;
-        rclcpp::Subscription<mts_msgs::DetectionProposal>::SharedPtr m_dproposal_sub;
+        const auto reference = *it;
+
+        // check if all winner vins are the same
+        return std::all_of(solutions.begin(), solutions.end(), [=](const mts_msgs::Solution& s) {
+            return s.winner_vin == reference.winner_vin || s.winner_vin == VinFlags::Ignored;
+        });
+    }
+
+    bool m_is_active = true;
+    // base package informations
+    double m_speed;
+    double m_direction;
+    int m_vin;
+    geometry_msgs::msg::PointStamped m_position;
+    Indicator m_indicator_state = Indicator::off;
+    Engine m_engine_state = Engine::on;
+
+    rclcpp::TimerBase::SharedPtr m_vehicle_update;
+    rclcpp::TimerBase::SharedPtr m_vehicle_msg_update;
+    rclcpp::TimerBase::SharedPtr m_vehicle_move_update;
+    const std::chrono::seconds m_system_update_period = 1s;
+    const std::chrono::milliseconds m_msg_send_period = 500ms;
+    const std::chrono::milliseconds m_vehicle_move_period = 300ms;
+    std::unordered_map<int, mts_msgs::VehicleBaseData::SharedPtr> m_nearby_vehicles;
+    rclcpp::Publisher<mts_msgs::VehicleBaseData>::SharedPtr m_vehicle_pub;
+    rclcpp::Subscription<mts_msgs::VehicleBaseData>::SharedPtr m_vehicle_sub;
+
+    Scenario m_detected_scenario;
+    std::unordered_map<int, mts_msgs::VehicleBaseData> m_proposal_vehicles;
+    std::vector<mts_msgs::DetectionProposal> m_proposal_buffer;
+    rclcpp::Publisher<mts_msgs::DetectionProposal>::SharedPtr m_dproposal_pub;
+    rclcpp::Subscription<mts_msgs::DetectionProposal>::SharedPtr m_dproposal_sub;
 
 
-        std::vector<mts_msgs::Solution> m_solution_buffer;
-        rclcpp::Publisher<mts_msgs::Solution>::SharedPtr m_solution_pub;
-        rclcpp::Subscription<mts_msgs::Solution>::SharedPtr m_solution_sub;
-        std::vector<int> m_solution_vins;
+    std::vector<mts_msgs::Solution> m_solution_buffer;
+    rclcpp::Publisher<mts_msgs::Solution>::SharedPtr m_solution_pub;
+    rclcpp::Subscription<mts_msgs::Solution>::SharedPtr m_solution_sub;
+    std::vector<int> m_solution_vins;
 
-        ScenarioSolver m_scenario_solver;
-        ScenarioDetector m_scenario_detector;
+    ScenarioSolver m_scenario_solver;
+    ScenarioDetector m_scenario_detector;
 
-        rclcpp::Time m_start_time;
-        rclcpp::Duration m_startup_time;
+    rclcpp::Time m_start_time;
+    rclcpp::Duration m_startup_time;
 
-        // temp
-        size_t m_count = 4;
-        double m_solution_delay;
-        double m_delay_time = 2;
+    // temp
+    size_t m_count = 4;
+    double m_solution_delay;
+    double m_delay_time = 2;
 };
 
 int main(int argc, char * argv[])

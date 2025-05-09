@@ -26,6 +26,13 @@ enum class Side
     left
 };
 
+enum VinFlags
+{
+    None = 0,
+    Invalid = -1,
+    Ignored = -2
+};
+
 class ScenarioSolver
 {
 public:

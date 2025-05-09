@@ -81,7 +81,7 @@ std::pair<int, mts_msgs::EventSiteData> ScenarioDetector::get_event_site(const m
     }
     else
     {
-        RCLCPP_ERROR(rclcpp::get_logger("rclcpp"), "Failed to call service add_two_ints");
+        RCLCPP_ERROR(rclcpp::get_logger("rclcpp"), "Failed to call service get_event_site");
         return std::pair<int, mts_msgs::EventSiteData>{};
     }
 }
@@ -294,7 +294,7 @@ float ScenarioDetector::get_event_site_distance(const geometry_msgs::msg::PointS
     }
     else
     {
-        RCLCPP_ERROR(rclcpp::get_logger("rclcpp"), "Failed to call service add_two_ints");
+        RCLCPP_ERROR(rclcpp::get_logger("rclcpp"), "Failed to call service get_event_site_distance");
         return 0;
     }
 }
