@@ -311,11 +311,14 @@ private:
         {
             m_solution_delay = this->get_clock()->now().seconds() + m_delay_time;
 
-            if (compare_solutions(m_solution_buffer) && solution->winner_vin == m_vin)
+            if (const auto res = compare_solutions(m_solution_buffer))
             {
-                RCLCPP_INFO(this->get_logger(), "Vehicle %d obtained driving permission", m_vin);
-                // grant driving permission 
-                m_speed = 1.0;
+                if (res->winner_vin == m_vin)
+                {
+                    RCLCPP_INFO(this->get_logger(), "Vehicle %d obtained driving permission", m_vin);
+                    // grant driving permission 
+                    m_speed = 1.0;
+                }
             }
 
             m_nearby_vehicles.clear();
@@ -324,24 +327,26 @@ private:
         }
     }
 
-    bool compare_solutions(const std::vector<mts_msgs::Solution>& solutions)
+    std::unique_ptr<mts_msgs::Solution> compare_solutions(const std::vector<mts_msgs::Solution>& solutions)
     {
-        const auto it = std::find_if(solutions.begin(), solutions.end(), [](const mts_msgs::Solution& s) {
+        const auto it = std::find_if(solutions.begin(), solutions.end(), [this](const mts_msgs::Solution& s) {
             return s.winner_vin != VinFlags::Ignored;
         });
 
         // every vin is "ignored" -> no solution possible
         if (it == solutions.end())
         {
-            return false;
+            return nullptr;
         }
 
-        const auto reference = *it;
+        const auto& reference = *it;
 
         // check if all winner vins are the same
-        return std::all_of(solutions.begin(), solutions.end(), [=](const mts_msgs::Solution& s) {
+        bool all_equal = std::all_of(solutions.begin(), solutions.end(), [=](const mts_msgs::Solution& s) {
             return s.winner_vin == reference.winner_vin || s.winner_vin == VinFlags::Ignored;
         });
+
+        return all_equal ? std::make_unique<mts_msgs::Solution>(reference) : nullptr;
     }
 
     bool m_is_active = true;
