@@ -382,7 +382,6 @@ private:
     rclcpp::Duration m_startup_time;
 
     // temp
-    size_t m_count = 4;
     double m_solution_delay;
     double m_delay_time = 2;
 };

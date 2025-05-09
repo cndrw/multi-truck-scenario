@@ -2,9 +2,14 @@
 
 #include <functional>
 #include <memory>
+
+#include "multi_truck_scenario/msg/vehicle_base_data.hpp"
 #include "scenario_type.hpp"
+#include "event_site.hpp"
 
 namespace cf { // classification
+
+namespace mts_msgs = multi_truck_scenario::msg;
 
 template <typename T>
 struct TreeNode
@@ -36,5 +41,16 @@ Scenario traverse(const std::shared_ptr<TreeNode<T>>& node, const T& data)
         return traverse(node->no, data);
     }
 }
+
+struct ScenarioSituation
+{
+    Scenario scenario;
+    EventSite event_site;
+    std::vector<mts_msgs::VehicleBaseData> vehicles;
+};
+
+Scenario knn_classify(const std::vector<ScenarioSituation>& data_set, const ScenarioSituation& input, const int k);
+
+double distance_func(const ScenarioSituation& a, const ScenarioSituation& b);
 
 }
