@@ -110,8 +110,8 @@ Scenario ScenarioDetector::check_2(const std::vector<mts_msgs::VehicleBaseData>&
     });
 
     const auto event_site = get_event_site(owner_vehicle);
-    const auto site_id = event_site.first;
-    const auto site_data = event_site.second;
+    const auto& site_id = event_site.first;
+    const auto& site_data = event_site.second;
 
     for (const auto& vehicle : vehicles)
     {

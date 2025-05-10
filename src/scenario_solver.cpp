@@ -33,7 +33,7 @@ std::unique_ptr<SolutionType> ScenarioSolver::solve(Scenario scenario, const std
             break;
 
         default:
-            RCLCPP_ERROR(m_logger, "Scenario solution not implemented yet");
+            RCLCPP_ERROR(m_logger, "Scenario solution not implemented yet %d", scenario);
             break;
     }
 

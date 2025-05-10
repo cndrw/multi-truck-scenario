@@ -32,8 +32,8 @@ from image2scene import output_event, output_event_streets
 def generate_launch_description():
     
     # Define image path using Pathlib
-    # image_path = script_dir / 'scenario_S2_colored.png'
-    image_path = script_dir / 'big_test.png'
+    image_path = script_dir / 'scenario_S2_colored.png'
+    # image_path = script_dir / 'big_test.png'
     
     """
     Read values from image using the function from image2scene.py

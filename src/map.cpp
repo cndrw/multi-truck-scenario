@@ -13,8 +13,8 @@
 #include "multi_truck_scenario/msg/vehicle_base_data.hpp"
 #include "multi_truck_scenario/srv/get_event_site_distance.hpp"
 #include "multi_truck_scenario/srv/get_event_site_id.hpp"
-#include "geometry_msgs/msg/point.hpp"
 #include "multi_truck_scenario/msg/solution.hpp"
+#include "multi_truck_scenario/msg/street_data.hpp"
 
 #include "event_site.hpp"
 
@@ -323,8 +323,21 @@ class Map : public rclcpp::Node
         });
 
         response->id = sites[0].first;
-        response->event_site.position = sites[0].second.position;
-        response->event_site.num_streets = 4;
+
+        const auto& site = sites[0].second;
+        response->event_site.position = site.position;
+
+        int street_count = std::count_if(site.streets.begin(), site.streets.end(), [](const auto& s) {
+            return s.width != 0;
+        });
+        response->event_site.num_streets = street_count;
+
+        for (const auto& street : site.streets)
+        {
+            auto street_data = mts_msgs::StreetData();
+            street_data.width = street.width;
+            response->event_site.streets.push_back(street_data);
+        }
     }
 
     void get_event_site_distance(const mts_srvs::GetEventSiteDistance::Request::SharedPtr request,
