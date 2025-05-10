@@ -78,6 +78,8 @@ public:
 private:
     void handle_parameters()
     {
+        this->declare_parameter("is_simulated", true);
+
         this->declare_parameter("position_x", 0.0);
         this->declare_parameter("position_y", 0.0);
         this->declare_parameter("position_z", 0.0);
@@ -89,6 +91,8 @@ private:
         
         this->declare_parameter("scenario_detector", 0);
         this->declare_parameter("decision_algorithm", 0);
+
+        m_is_simulated = this->get_parameter("is_simulated").as_bool();
         
         m_position.point.x = this->get_parameter("position_x").as_double();
         m_position.point.y = this->get_parameter("position_y").as_double();
@@ -102,6 +106,7 @@ private:
         m_speed = this->get_parameter("speed").as_double();
         m_indicator_state = (Indicator)this->get_parameter("indicator_state").as_int();
         m_engine_state = (Engine)this->get_parameter("engine_state").as_int();
+
     }
 
     void update()
@@ -163,13 +168,16 @@ private:
         const auto now_time = this->get_clock()->now();
         const auto delta_time = now_time - last_time;
 
-        // get driving direction
-        const double dy = std::sin(m_direction * tutils::DEG2RAD);
-        const double dx = std::cos(m_direction * tutils::DEG2RAD);
+        if (m_driving_permission && m_is_simulated)
+        {
+            // get driving direction
+            const double dy = std::sin(m_direction * tutils::DEG2RAD);
+            const double dx = std::cos(m_direction * tutils::DEG2RAD);
 
-        const double delta_move = m_speed * delta_time.seconds();
-        m_position.point.x += delta_move * dx;
-        m_position.point.y += delta_move * dy;
+            const double delta_move = m_speed * delta_time.seconds();
+            m_position.point.x += delta_move * dx;
+            m_position.point.y += delta_move * dy;
+        }
 
         last_time = now_time;
     }
@@ -317,6 +325,7 @@ private:
                 {
                     RCLCPP_INFO(this->get_logger(), "Vehicle %d obtained driving permission", m_vin);
                     // grant driving permission 
+                    m_driving_permission = true;
                     m_speed = 1.0;
                 }
             }
@@ -350,6 +359,9 @@ private:
     }
 
     bool m_is_active = true;
+    bool m_driving_permission = false;
+    bool m_is_simulated = true;
+
     // base package informations
     double m_speed;
     double m_direction;
@@ -364,6 +376,7 @@ private:
     const std::chrono::seconds m_system_update_period = 1s;
     const std::chrono::milliseconds m_msg_send_period = 500ms;
     const std::chrono::milliseconds m_vehicle_move_period = 300ms;
+
     std::unordered_map<int, mts_msgs::VehicleBaseData::SharedPtr> m_nearby_vehicles;
     rclcpp::Publisher<mts_msgs::VehicleBaseData>::SharedPtr m_vehicle_pub;
     rclcpp::Subscription<mts_msgs::VehicleBaseData>::SharedPtr m_vehicle_sub;
@@ -373,7 +386,6 @@ private:
     std::vector<mts_msgs::DetectionProposal> m_proposal_buffer;
     rclcpp::Publisher<mts_msgs::DetectionProposal>::SharedPtr m_dproposal_pub;
     rclcpp::Subscription<mts_msgs::DetectionProposal>::SharedPtr m_dproposal_sub;
-
 
     std::vector<mts_msgs::Solution> m_solution_buffer;
     rclcpp::Publisher<mts_msgs::Solution>::SharedPtr m_solution_pub;
@@ -387,7 +399,6 @@ private:
     rclcpp::Duration m_startup_time;
 
     // temp
-    size_t m_count = 4;
     double m_solution_delay;
     double m_delay_time = 2;
 };

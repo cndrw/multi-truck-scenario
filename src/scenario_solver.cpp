@@ -160,7 +160,6 @@ void ScenarioSolver::pick_random_vehicle()
         int rnd_vin = (std::rand() % 4) + 1; 
 
         m_solution.author_vin = m_owner_vin;
-        RCLCPP_INFO(m_logger, "random vin is: %d", rnd_vin);
         m_solution.winner_vin = rnd_vin;
     }
     else
