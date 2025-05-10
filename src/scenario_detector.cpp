@@ -135,19 +135,34 @@ Scenario ScenarioDetector::check_2(const std::vector<mts_msgs::VehicleBaseData>&
         }
     }
 
-    if (invoveld_vehicles.empty())
+    if (invoveld_vehicles.empty() || invoveld_vehicles.size() == 1)
     {
-        RCLCPP_INFO(m_logger, "No Vehicle where involved in viewed scenario");
+        RCLCPP_INFO(m_logger, "Invalid amount of involved Vehicles in viewed Scenario (%d)", invoveld_vehicles.size());
         return Scenario::None;
     }
 
     auto sorted_vehicles = get_sorted_vehicles(invoveld_vehicles, site_id);
-    auto scenario = scenario_classification({sorted_vehicles, site_data});
-    m_vehicles = sorted_vehicles;
 
-    RCLCPP_INFO(m_logger, "Vehicle %d detected scenario: %d", m_owner_vin, scenario);
+    Scenario scenario_result = Scenario::None; 
+    for (size_t i = 2; i <= sorted_vehicles.size(); i++)
+    {
+        std::vector<mts_msgs::VehicleBaseData> sub(sorted_vehicles.begin(), sorted_vehicles.begin() + i);
+        const auto cur_scenario = scenario_classification({sub, site_data});
 
-    return scenario;
+        if (cur_scenario != Scenario::None)
+        {
+            scenario_result = cur_scenario;
+        }
+        else 
+        {
+            break;
+        }
+    }
+
+    m_vehicles = sorted_vehicles; // involved vehicles (final)
+    RCLCPP_INFO(m_logger, "Vehicle %d detected scenario: %d", m_owner_vin, scenario_result);
+
+    return scenario_result;
 }
 
 
@@ -337,13 +352,13 @@ Scenario ScenarioDetector::scenario_classification(const DecisionData& data)
 
 void ScenarioDetector::init_decision_tree()
 {
-    m_dtree = std::make_shared<cf::TreeNode<DecisionData>>([this](const DecisionData& data) {
+    m_dtree = std::make_shared<cf::TreeNode<DecisionData>>([](const DecisionData& data) {
         return data.second.num_streets > 2;
     });
 
     m_dtree->no = std::make_shared<cf::TreeNode<DecisionData>>(Scenario::None); // potential Scenario s3
 
-    m_dtree->yes = std::make_shared<cf::TreeNode<DecisionData>>([this](const DecisionData& data){
+    m_dtree->yes = std::make_shared<cf::TreeNode<DecisionData>>([](const DecisionData& data){
         // temporary decision between S1 & S2 until the width of the streets is present
         return data.first.size() > 2;
     });
