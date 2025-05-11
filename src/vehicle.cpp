@@ -122,6 +122,10 @@ private:
             return;
         }
 
+        if (m_solution_delay - this->now().seconds() > 0)
+        {
+            return;
+        }
 
         std::vector<mts_msgs::VehicleBaseData> tmp;
         tmp.reserve(m_nearby_vehicles.size());
@@ -130,17 +134,23 @@ private:
             tmp.push_back(*v.second);
         }
 
-        if (tmp.size() != 0)
+        // check scenario
+        const auto res = m_scenario_detector.check(tmp);
+        if (res.first == Scenario::None)
         {
-            const auto res = m_scenario_detector.check(tmp);
-            for (const auto& v : res.second)
-            {
-                m_proposal_vehicles.emplace(v.vin, v);
-            }
-
-            m_detected_scenario = res.first;
-            send_scenario_proposal(m_detected_scenario);
+            if (!m_driving_permission) RCLCPP_INFO(get_logger(), "No scenario found - grant driving permission");
+            m_driving_permission = true;
+            m_speed = 1.0;
+            return;
         }
+
+        for (const auto& v : res.second)
+        {
+            m_proposal_vehicles.emplace(v.vin, v);
+        }
+
+        m_detected_scenario = res.first;
+        send_scenario_proposal(m_detected_scenario);
 
         m_nearby_vehicles.clear();
     }
@@ -212,7 +222,7 @@ private:
             return;
         }
 
-        if (m_solution_delay - this->get_clock()->now().seconds() > 0)
+        if (m_solution_delay - this->now().seconds() > 0)
         {
             return;
         }
@@ -327,6 +337,10 @@ private:
                     // grant driving permission 
                     m_driving_permission = true;
                     m_speed = 1.0;
+                }
+                else 
+                {
+                    m_driving_permission = false;
                 }
             }
 

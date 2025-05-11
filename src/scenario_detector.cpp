@@ -46,6 +46,10 @@ ScenarioDetector::ScenarioDetector() : m_logger(rclcpp::get_logger("detector"))
 std::pair<Scenario, std::vector<mts_msgs::VehicleBaseData>>
 ScenarioDetector::check(const std::vector<mts_msgs::VehicleBaseData>& vehicles)
 {
+    if (vehicles.empty() || vehicles.size() == 1)
+    {
+        return {Scenario::None, vehicles};
+    }
     return {impl[m_implementation](vehicles), m_vehicles};
 }
 
@@ -130,7 +134,7 @@ Scenario ScenarioDetector::check_2(const std::vector<mts_msgs::VehicleBaseData>&
         }
         else if (vehicle.vin == m_owner_vin)
         {
-            RCLCPP_INFO(m_logger, "Vehicle %d is not involved in viewed scenario");
+            RCLCPP_INFO(m_logger, "Vehicle %d is not involved in viewed scenario", m_owner_vin);
             return Scenario::None;
         }
     }
