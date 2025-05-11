@@ -17,4 +17,14 @@ namespace tutils {
         const geometry_msgs::msg::PointStamped& p1,
         const geometry_msgs::msg::PointStamped& p2
     );
+
+    geometry_msgs::msg::Point add(
+        const geometry_msgs::msg::Point& p1,
+        const geometry_msgs::msg::Point& p2
+    );
+
+    geometry_msgs::msg::Point add(
+        const geometry_msgs::msg::Point& p1,
+        const double factor
+    );
 }

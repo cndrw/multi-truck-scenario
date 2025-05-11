@@ -9,7 +9,6 @@ Panels:
         - /Marker1
         - /Marker1/Namespaces1
         - /MarkerArray1
-        - /MarkerArray1/Status1
       Splitter Ratio: 0.5
     Tree Height: 475
   - Class: rviz_common/Selection
@@ -73,7 +72,6 @@ Visualization Manager:
         1: true
         2: true
         3: true
-        4: true
       Topic:
         Depth: 5
         Durability Policy: Volatile
@@ -85,13 +83,25 @@ Visualization Manager:
       Enabled: true
       Name: MarkerArray
       Namespaces:
-        border_: true
+        {}
       Topic:
         Depth: 5
         Durability Policy: Volatile
         History Policy: Keep Last
         Reliability Policy: Reliable
         Value: /cube_dta_arr
+      Value: true
+    - Class: rviz_default_plugins/Marker
+      Enabled: true
+      Name: Marker
+      Namespaces:
+        arrows: true
+      Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /arrow_dta
       Value: true
   Enabled: true
   Global Options:
