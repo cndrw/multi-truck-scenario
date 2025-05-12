@@ -25,7 +25,7 @@ class ScenarioDetector
 {
 public:
     ScenarioDetector();
-    Scenario check(const std::vector<mts_msgs::VehicleBaseData>& vehicle);
+    std::pair<Scenario, std::vector<mts_msgs::VehicleBaseData>> check(const std::vector<mts_msgs::VehicleBaseData>& vehicle);
     void set_implemenation(const int detector, [[maybe_unused]] const int decision_algo /*impl 2 only*/);
     void set_owner(const int owner_vin);
 
@@ -59,6 +59,7 @@ private:
     int m_implementation = -1;
     int m_decision_algo = 0;
     int m_cur_event_site_id = -1;
+    std::vector<mts_msgs::VehicleBaseData> m_vehicles;
     std::array<std::function<Scenario(const std::vector<mts_msgs::VehicleBaseData>&)>, 2> impl;
     std::array<std::function<Scenario(const DecisionData&)>, 2> m_decision_algo_impl;
     std::shared_ptr<cf::TreeNode<DecisionData>> m_dtree;

@@ -27,4 +27,24 @@ geometry_msgs::msg::PointStamped add(
     return p;
 }
 
+geometry_msgs::msg::Point add(
+    const geometry_msgs::msg::Point& p1,
+    const geometry_msgs::msg::Point& p2
+)
+{
+    auto p = geometry_msgs::msg::Point();
+    p.x = p1.x + p2.x;
+    p.y = p1.y + p2.y;
+    p.z = p1.z + p2.z;
+    return p;
+}
+geometry_msgs::msg::Point add(const geometry_msgs::msg::Point &p1, const double factor)
+{
+    auto p = geometry_msgs::msg::Point();
+    p.x = p1.x + factor;
+    p.y = p1.y + factor;
+    p.z = p1.z + factor;
+    return p;
+}
+
 }

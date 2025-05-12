@@ -8,7 +8,7 @@
 
 static constexpr uint8_t S1_MAX_VEHICLES { 3 };
 static constexpr uint8_t S2_MAX_VEHICLES { 4 };
-static constexpr auto INVALID_VIN { -1 };
+
 
 void ScenarioSolver::set_owner(int vin)
 {
@@ -19,7 +19,7 @@ void ScenarioSolver::set_owner(int vin)
 std::unique_ptr<SolutionType> ScenarioSolver::solve(Scenario scenario, const std::vector<mts_msgs::VehicleBaseData>& vehicles)
 {
     // reset solution 
-    m_solution.winner_vin = INVALID_VIN;
+    m_solution.winner_vin = VinFlags::Invalid;
 
     m_vehicles = vehicles;
     switch (scenario)
@@ -37,7 +37,7 @@ std::unique_ptr<SolutionType> ScenarioSolver::solve(Scenario scenario, const std
             break;
     }
 
-    if (m_solution.winner_vin == INVALID_VIN)
+    if (m_solution.winner_vin == VinFlags::Invalid)
     {
         return nullptr;
     }
@@ -69,7 +69,6 @@ void ScenarioSolver::solve_s1()
 
 void ScenarioSolver::solve_s2()
 {
-    RCLCPP_INFO(m_logger, "solve s2");
     if (m_vehicles.size() == S2_MAX_VEHICLES)
     {
         pick_random_vehicle();
@@ -83,7 +82,7 @@ void ScenarioSolver::solve_s2()
 
 int ScenarioSolver::get_vehicle(const mts_msgs::VehicleBaseData& vehicle, Side side)
 {
-    int winner_vin = INVALID_VIN;
+    int winner_vin = VinFlags::Invalid;
     constexpr auto reference_angle = 90.0;
     const auto adjust_angle = reference_angle - vehicle.direction;
 
@@ -140,13 +139,13 @@ int ScenarioSolver::solve_uncontrolled_intersection()
 {
     for (const auto& vehicle: m_vehicles)
     {
-        if (get_vehicle(vehicle, Side::right) == INVALID_VIN)
+        if (get_vehicle(vehicle, Side::right) == VinFlags::Invalid)
         {
             m_solution.author_vin = m_owner_vin;
             return vehicle.vin;
         }
     }
-    return INVALID_VIN;
+    return VinFlags::Invalid;
 }
 
 void ScenarioSolver::pick_random_vehicle()
@@ -162,6 +161,9 @@ void ScenarioSolver::pick_random_vehicle()
 
         m_solution.author_vin = m_owner_vin;
         m_solution.winner_vin = rnd_vin;
-        RCLCPP_INFO(m_logger, "rand winner: %d", rnd_vin);
+    }
+    else
+    {
+        m_solution.winner_vin = VinFlags::Ignored;
     }
 }

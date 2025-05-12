@@ -43,9 +43,14 @@ ScenarioDetector::ScenarioDetector() : m_logger(rclcpp::get_logger("detector"))
     init_decision_tree();
 }
 
-Scenario ScenarioDetector::check(const std::vector<mts_msgs::VehicleBaseData>& vehicles)
+std::pair<Scenario, std::vector<mts_msgs::VehicleBaseData>>
+ScenarioDetector::check(const std::vector<mts_msgs::VehicleBaseData>& vehicles)
 {
-    return impl[m_implementation](vehicles);
+    if (vehicles.empty() || vehicles.size() == 1)
+    {
+        return {Scenario::None, vehicles};
+    }
+    return {impl[m_implementation](vehicles), m_vehicles};
 }
 
 Scenario ScenarioDetector::check_1([[maybe_unused]] const std::vector<mts_msgs::VehicleBaseData>& vehicles)
@@ -80,7 +85,7 @@ std::pair<int, mts_msgs::EventSiteData> ScenarioDetector::get_event_site(const m
     }
     else
     {
-        RCLCPP_ERROR(rclcpp::get_logger("rclcpp"), "Failed to call service add_two_ints");
+        RCLCPP_ERROR(rclcpp::get_logger("rclcpp"), "Failed to call service get_event_site");
         return std::pair<int, mts_msgs::EventSiteData>{};
     }
 }
@@ -102,6 +107,7 @@ ScenarioDetector::apply_fuzzy_logic(const std::vector<mts_msgs::VehicleBaseData>
 
 Scenario ScenarioDetector::check_2(const std::vector<mts_msgs::VehicleBaseData>& vehicles)
 {
+    m_vehicles.clear();
     std::vector<mts_msgs::VehicleBaseData>  invoveld_vehicles;
 
     // get nearest event site to owner vin
@@ -128,23 +134,39 @@ Scenario ScenarioDetector::check_2(const std::vector<mts_msgs::VehicleBaseData>&
         }
         else if (vehicle.vin == m_owner_vin)
         {
-            RCLCPP_INFO(m_logger, "Vehicle %d is not involved in viewed scenario");
+            RCLCPP_INFO(m_logger, "Vehicle %d is not involved in viewed scenario", m_owner_vin);
             return Scenario::None;
         }
     }
 
-    if (invoveld_vehicles.empty())
+    if (invoveld_vehicles.empty() || invoveld_vehicles.size() == 1)
     {
-        RCLCPP_INFO(m_logger, "No Vehicle where involved in viewed scenario");
+        RCLCPP_INFO(m_logger, "Invalid amount of involved Vehicles in viewed Scenario (%d)", invoveld_vehicles.size());
         return Scenario::None;
     }
 
     auto sorted_vehicles = get_sorted_vehicles(invoveld_vehicles, site_id);
-    auto scenario = scenario_classification({sorted_vehicles, site_data});
 
-    RCLCPP_INFO(m_logger, "Vehicle %d detected scenario: %d", m_owner_vin, scenario);
+    Scenario scenario_result = Scenario::None; 
+    for (size_t i = 2; i <= sorted_vehicles.size(); i++)
+    {
+        std::vector<mts_msgs::VehicleBaseData> sub(sorted_vehicles.begin(), sorted_vehicles.begin() + i);
+        const auto cur_scenario = scenario_classification({sub, site_data});
 
-    return scenario;
+        if (cur_scenario != Scenario::None)
+        {
+            scenario_result = cur_scenario;
+        }
+        else 
+        {
+            break;
+        }
+    }
+
+    m_vehicles = sorted_vehicles; // involved vehicles (final)
+    RCLCPP_INFO(m_logger, "Vehicle %d detected scenario: %d", m_owner_vin, scenario_result);
+
+    return scenario_result;
 }
 
 
@@ -291,7 +313,7 @@ float ScenarioDetector::get_event_site_distance(const geometry_msgs::msg::PointS
     }
     else
     {
-        RCLCPP_ERROR(rclcpp::get_logger("rclcpp"), "Failed to call service add_two_ints");
+        RCLCPP_ERROR(rclcpp::get_logger("rclcpp"), "Failed to call service get_event_site_distance");
         return 0;
     }
 }
@@ -334,16 +356,14 @@ Scenario ScenarioDetector::scenario_classification(const DecisionData& data)
 
 void ScenarioDetector::init_decision_tree()
 {
-    m_dtree = std::make_shared<cf::TreeNode<DecisionData>>([this](const DecisionData& data) {
-        RCLCPP_INFO(m_logger, "num_streets: %d", data.second.num_streets);
+    m_dtree = std::make_shared<cf::TreeNode<DecisionData>>([](const DecisionData& data) {
         return data.second.num_streets > 2;
     });
 
     m_dtree->no = std::make_shared<cf::TreeNode<DecisionData>>(Scenario::None); // potential Scenario s3
 
-    m_dtree->yes = std::make_shared<cf::TreeNode<DecisionData>>([this](const DecisionData& data){
+    m_dtree->yes = std::make_shared<cf::TreeNode<DecisionData>>([](const DecisionData& data){
         // temporary decision between S1 & S2 until the width of the streets is present
-        RCLCPP_INFO(m_logger, "num vehicles: %d", data.first.size());
         return data.first.size() > 2;
     });
 

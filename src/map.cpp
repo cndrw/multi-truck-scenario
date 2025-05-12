@@ -16,6 +16,7 @@
 #include "multi_truck_scenario/msg/solution.hpp"
 #include "multi_truck_scenario/msg/street_data.hpp"
 
+#include "tutils.h"
 #include "event_site.hpp"
 
 using namespace std::chrono_literals;
@@ -43,6 +44,7 @@ class Map : public rclcpp::Node
 
         m_grid_pub = this->create_publisher<nav_msgs::msg::OccupancyGrid>("map_data", 10);
         m_cube_pub = this->create_publisher<visualization_msgs::msg::Marker>("cube_dta", 10);
+        m_arrow_pub = this->create_publisher<visualization_msgs::msg::Marker>("arrow_dta", 10);
         m_border_pub = this->create_publisher<visualization_msgs::msg::MarkerArray>("cube_dta_arr", 10);
 
         m_timer = this->create_wall_timer(
@@ -201,7 +203,7 @@ class Map : public rclcpp::Node
     visualization_msgs::msg::Marker draw_border_block(const float x, const float y, const float height, const int id)
     {
       auto cube = visualization_msgs::msg::Marker();
-      cube.header.stamp = rclcpp::Clock().now();
+      cube.header.stamp = this->now();
       cube.header.frame_id = "map_frame";
       cube.action = visualization_msgs::msg::Marker::ADD;
       cube.type = visualization_msgs::msg::Marker::CUBE;
@@ -223,7 +225,7 @@ class Map : public rclcpp::Node
     void draw_car(float x, float y, int id)
     {
       auto cube = visualization_msgs::msg::Marker();
-      cube.header.stamp = rclcpp::Clock().now();
+      cube.header.stamp = this->now();
       cube.header.frame_id = "map_frame";
       cube.action = visualization_msgs::msg::Marker::ADD;
       cube.type = visualization_msgs::msg::Marker::CUBE;
@@ -240,34 +242,66 @@ class Map : public rclcpp::Node
       m_cube_pub->publish(cube);
     }
 
+    void draw_heading_arrow(const geometry_msgs::msg::Point& pos, float direction_angle, int id)
+    {
+        auto marker = visualization_msgs::msg::Marker();
+        marker.header.frame_id = "map_frame";
+        marker.header.stamp = this->now();
+        marker.ns = "arrows";
+        marker.id = id;
+        marker.type = visualization_msgs::msg::Marker::ARROW;
+        marker.action = visualization_msgs::msg::Marker::ADD;
+
+        auto end = geometry_msgs::msg::Point();
+        end.x = std::cos(direction_angle * tutils::DEG2RAD);
+        end.y = std::sin(direction_angle * tutils::DEG2RAD);
+        end.z = 0.0;
+
+        auto mid_point = tutils::add(pos, 0.5);
+
+        marker.points.push_back(mid_point);
+        marker.points.push_back(tutils::add(mid_point, end));
+
+        marker.scale.x = 0.1;  // Schaftdurchmesser
+        marker.scale.y = 0.2;   // Pfeilkopfdurchmesser
+        marker.scale.z = 0.2;   // Pfeilkopflänge
+
+        marker.color.r = 1.0f;
+        marker.color.g = 0.0f;
+        marker.color.b = 0.0f;
+        marker.color.a = 1.0;
+
+        marker.lifetime = rclcpp::Duration(2, 0);
+        m_arrow_pub->publish(marker);
+    }
+
     void timer_callback()
     {
+        auto grid = nav_msgs::msg::OccupancyGrid();
+        grid.info.height = m_height;
+        grid.info.width = m_width;
+        grid.info.resolution = m_resolution;
 
-      auto grid = nav_msgs::msg::OccupancyGrid();
-      grid.info.height = m_height;
-      grid.info.width = m_width;
-      grid.info.resolution = m_resolution;
+        grid.header.stamp = rclcpp::Clock().now();
+        grid.header.frame_id = "map_frame";
 
-      grid.header.stamp = rclcpp::Clock().now();
-      grid.header.frame_id = "map_frame";
+        grid.info.origin.position.x = 0;
+        grid.info.origin.position.y = 0;
+        grid.info.origin.position.z = 0;
+        grid.info.origin.orientation.x = 0;
+        grid.info.origin.orientation.y = 0;
+        grid.info.origin.orientation.z = 0;
+        grid.info.origin.orientation.w = 1;
 
-      grid.info.origin.position.x = 0;
-      grid.info.origin.position.y = 0;
-      grid.info.origin.position.z = 0;
-      grid.info.origin.orientation.x = 0;
-      grid.info.origin.orientation.y = 0;
-      grid.info.origin.orientation.z = 0;
-      grid.info.origin.orientation.w = 1;
+        add_to_map(m_static_map);
+        draw_border();
 
-      add_to_map(m_static_map);
-      draw_border();
-   
-      grid.data = m_grid;
-    
+        grid.data = m_grid;
 
-      m_grid_pub->publish(grid);
 
-      clear_map();
+        m_grid_pub->publish(grid);
+
+        clear_map();
     }
 
     void vehicle_position_callback(const mts_msgs::VehicleBaseData::SharedPtr vehicle_data)
@@ -293,6 +327,7 @@ class Map : public rclcpp::Node
 
         auto pos = vehicle_data->position.point;
         draw_car(pos.x, pos.y, vehicle_data->vin);
+        draw_heading_arrow(vehicle_data->position.point, vehicle_data->direction, vehicle_data->vin);
     }
 
     bool is_out_of_bound(const geometry_msgs::msg::Point& pos)
@@ -402,6 +437,7 @@ class Map : public rclcpp::Node
     rclcpp::Service<mts_srvs::GetEventSiteID>::SharedPtr m_esite_id_srv;
 
     rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr m_cube_pub;
+    rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr m_arrow_pub;
     rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr m_border_pub;
 };
 

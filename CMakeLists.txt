@@ -29,6 +29,7 @@ set(msg_files
   "msg/Solution.msg"
   "msg/EventSiteData.msg"
   "msg/StreetData.msg"
+  "msg/DetectionProposal.msg"
 )
 
 set(srv_files
@@ -46,8 +47,11 @@ add_library(scenario_lib
   STATIC src/scenario_solver.cpp
          src/scenario_detector.cpp
          src/classification.cpp
-         src/tutils.cpp
 ) 
+
+add_library(truck_utils_lib
+  STATIC src/tutils.cpp
+)
 
 # Ausführbares Ziel
 add_executable(map_node src/map.cpp)
@@ -57,17 +61,22 @@ add_executable(vehicle_node src/vehicle.cpp)
 
 ament_target_dependencies(vehicle_node rclcpp geometry_msgs std_msgs)
 target_include_directories(vehicle_node PRIVATE includes)
+target_link_libraries(vehicle_node scenario_lib truck_utils_lib)
 
 target_include_directories(scenario_lib PRIVATE includes)
+target_link_libraries(scenario_lib truck_utils_lib)
+
+target_include_directories(truck_utils_lib PRIVATE includes)
 
 ament_target_dependencies(map_node rclcpp nav_msgs visualization_msgs)
 target_include_directories(map_node PRIVATE includes)
+target_link_libraries(map_node truck_utils_lib)
 
-target_link_libraries(vehicle_node scenario_lib)
 
 rosidl_target_interfaces(map_node ${PROJECT_NAME} "rosidl_typesupport_cpp")
 rosidl_target_interfaces(vehicle_node ${PROJECT_NAME} "rosidl_typesupport_cpp")
 rosidl_target_interfaces(scenario_lib ${PROJECT_NAME} "rosidl_typesupport_cpp")
+rosidl_target_interfaces(truck_utils_lib ${PROJECT_NAME} "rosidl_typesupport_cpp")
 
 
 

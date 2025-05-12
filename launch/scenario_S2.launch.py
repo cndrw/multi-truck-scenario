@@ -97,7 +97,8 @@ def generate_launch_description():
                     'position_x': vehicle['position_x'],
                     'position_y': vehicle['position_y'],
                     'position_z': vehicle['position_z'],
-                    'direction': vehicle['direction_angle']
+                    'direction': vehicle['direction_angle'],
+                    'is_simulated': True
                 }, params_file],
                 arguments=['--ros-args', '--log-level', 'INFO']
             )
