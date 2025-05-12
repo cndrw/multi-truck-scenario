@@ -28,6 +28,7 @@ set(msg_files
   "msg/VehicleBaseData.msg"
   "msg/Solution.msg"
   "msg/EventSiteData.msg"
+  "msg/StreetData.msg"
   "msg/DetectionProposal.msg"
 )
 

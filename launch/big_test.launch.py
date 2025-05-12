@@ -15,37 +15,21 @@ import sys
 ## --------------------------------------------------------------------------------
 ## Pathlib option - more modern and recommended
 workspace_dir = Path(__file__).resolve().parent.parent
-config_dir = workspace_dir / 'config'
-config_file_path = config_dir / 'config_1.rviz'
+config_file_path = workspace_dir / 'config' / 'config_1.rviz'
 config_file_path = config_file_path.resolve()
-
-params_file = config_dir / 'params.yaml'
 ## --------------------------------------------------------------------------------
 ## Add the script directory to the Python path
 script_dir = Path(__file__).resolve().parent.parent / 'script'
 sys.path.insert(0, str(script_dir))
 # Import the function that generates the RViz-compatible grid data
 from image2grid_converter import generate_rviz_static_map
-from image2scene import output_event, output_event_streets
 ## --------------------------------------------------------------------------------
 
 def generate_launch_description():
     
     # Define image path using Pathlib
-    image_path = script_dir / 'scenario_S2_colored.png'
-    # image_path = script_dir / 'big_test.png'
+    image_path = script_dir / 'big_test.png'
     
-    """
-    Read values from image using the function from image2scene.py
-    This function will return a list of tuples with the crossing values
-    The tuples will contain the width, height, and bottom left corner of the crossing
-    in cpp code then:
-    split crossing vals into n tuples, that can be used to parametrize the map node 
-    """
-    crossing_vals = output_event(str(image_path))
-    street_vals = output_event_streets(str(image_path))
-    width_values,height_values,bot_left_x_values,bot_left_y_values = crossing_vals[0],crossing_vals[1],crossing_vals[2],crossing_vals[3]
-    width_street_left, width_street_right, width_street_top, width_street_bottom = street_vals[0],street_vals[1],street_vals[2],street_vals[3]
     # Generate static map using the function from image_converter.py
     result = generate_rviz_static_map(str(image_path))
     # static_map = result['static_map']
@@ -65,6 +49,8 @@ def generate_launch_description():
     #     'width': result['width'],
     #     'static_map': result['static_map']
     # }
+
+    # extract vehicle start coordinates from result
 
 
     vehicles = [
@@ -97,9 +83,8 @@ def generate_launch_description():
                     'position_x': vehicle['position_x'],
                     'position_y': vehicle['position_y'],
                     'position_z': vehicle['position_z'],
-                    'direction': vehicle['direction_angle'],
-                    'is_simulated': True
-                }, params_file],
+                    'direction': vehicle['direction_angle']
+                }],
                 arguments=['--ros-args', '--log-level', 'INFO']
             )
         )
@@ -113,18 +98,9 @@ def generate_launch_description():
             ## add parameter for grid data
             ## parameters not yet implemented in map.cpp
             parameters=[{
-                'height': result['height'],
-                'width': result['width'],
-                'static_map': result['static_map'],
-                'crossing_width_values': width_values,
-                'crossing_height_values': height_values,
-                'crossing_bot_left_x_values': bot_left_x_values,
-                'crossing_bot_left_y_values': bot_left_y_values,
-                'street_width_left': width_street_left,
-                'street_width_right': width_street_right,
-                'street_width_top': width_street_top,
-                'street_width_bottom': width_street_bottom,
-
+                 'height': result['height'],
+                 'width': result['width'],
+                 'static_map': result['static_map'],
             }],
         ),
         # launch rviz2 for 

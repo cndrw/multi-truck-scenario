@@ -14,6 +14,7 @@
 #include "multi_truck_scenario/srv/get_event_site_distance.hpp"
 #include "multi_truck_scenario/srv/get_event_site_id.hpp"
 #include "multi_truck_scenario/msg/solution.hpp"
+#include "multi_truck_scenario/msg/street_data.hpp"
 
 #include "tutils.h"
 #include "event_site.hpp"
@@ -81,12 +82,31 @@ class Map : public rclcpp::Node
         this->declare_parameter<std::vector<int64_t>>("crossing_height_values", {});
         this->declare_parameter<std::vector<int64_t>>("crossing_bot_left_x_values", {});
         this->declare_parameter<std::vector<int64_t>>("crossing_bot_left_y_values", {});
+        this->declare_parameter<std::vector<int64_t>>("street_width_left", {});
+        this->declare_parameter<std::vector<int64_t>>("street_width_right", {});
+        this->declare_parameter<std::vector<int64_t>>("street_width_top", {});
+        this->declare_parameter<std::vector<int64_t>>("street_width_bottom", {});
 
         const auto width_values = this->get_parameter("crossing_width_values").as_integer_array();
         const auto height_values = this->get_parameter("crossing_height_values").as_integer_array();
         const auto bot_left_x_values = this->get_parameter("crossing_bot_left_x_values").as_integer_array();
         const auto bot_left_y_values = this->get_parameter("crossing_bot_left_y_values").as_integer_array();
-        
+        const auto street_width_left = this->get_parameter("street_width_left").as_integer_array();
+        const auto street_width_right = this->get_parameter("street_width_right").as_integer_array();
+        const auto street_width_top = this->get_parameter("street_width_top").as_integer_array();
+        const auto street_width_bottom = this->get_parameter("street_width_bottom").as_integer_array();
+
+        // Set content of struct Street
+        size_t num_streets = street_width_left.size();
+        if (street_width_right.size() != num_streets ||
+            street_width_top.size() != num_streets ||
+            street_width_bottom.size() != num_streets) 
+        {
+            RCLCPP_ERROR(this->get_logger(), "Mismatch in size of street parameter arrays!");
+            return;
+        }
+
+        // Set content of struct EventSite
         size_t num_sites = width_values.size();
         if (height_values.size() != num_sites || 
         bot_left_x_values.size() != num_sites || 
@@ -103,7 +123,26 @@ class Map : public rclcpp::Node
             site.position.x = bot_left_x_values[i];
             site.position.y = bot_left_y_values[i];
             site.position.z = 0.0; // Assuming z is always 0 for the event site
+            site.streets = { // Assuming 4 streets for each event site
+              Street{static_cast<int>(street_width_left[i])},
+              Street{static_cast<int>(street_width_right[i])},
+              Street{static_cast<int>(street_width_top[i])},
+              Street{static_cast<int>(street_width_bottom[i])}
+            };
             m_event_sites.emplace(i, site);
+            RCLCPP_INFO(this->get_logger(), 
+                "EventSite %zu: pos=(%.1f, %.1f), size=(%d x %d), Streets [L=%d, R=%d, T=%d, B=%d]", 
+                i,
+               site.position.x,
+               site.position.y,
+               site.width,
+               site.height,
+               site.streets[0].width,
+               site.streets[1].width,
+               site.streets[2].width,
+               site.streets[3].width
+              );
+
         }
     }
 
@@ -319,8 +358,21 @@ class Map : public rclcpp::Node
         });
 
         response->id = sites[0].first;
-        response->event_site.position = sites[0].second.position;
-        response->event_site.num_streets = 4;
+
+        const auto& site = sites[0].second;
+        response->event_site.position = site.position;
+
+        int street_count = std::count_if(site.streets.begin(), site.streets.end(), [](const auto& s) {
+            return s.width != 0;
+        });
+        response->event_site.num_streets = street_count;
+
+        for (const auto& street : site.streets)
+        {
+            auto street_data = mts_msgs::StreetData();
+            street_data.width = street.width;
+            response->event_site.streets.push_back(street_data);
+        }
     }
 
     void get_event_site_distance(const mts_srvs::GetEventSiteDistance::Request::SharedPtr request,
