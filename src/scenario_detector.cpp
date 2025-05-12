@@ -363,12 +363,49 @@ void ScenarioDetector::init_decision_tree()
     m_dtree->no = std::make_shared<cf::TreeNode<DecisionData>>(Scenario::None); // potential Scenario s3
 
     m_dtree->yes = std::make_shared<cf::TreeNode<DecisionData>>([](const DecisionData& data){
-        // temporary decision between S1 & S2 until the width of the streets is present
-        return data.first.size() > 2;
+        return data.first.size() == 4;
     });
 
     m_dtree->yes->yes = std::make_shared<cf::TreeNode<DecisionData>>(Scenario::S2);
-    m_dtree->yes->no = std::make_shared<cf::TreeNode<DecisionData>>(Scenario::S1);
+    m_dtree->yes->no = std::make_shared<cf::TreeNode<DecisionData>>([](const DecisionData& data){
+        // priority vehicle does NOT indicator left
+        const auto& vehicles = data.first;
+        const auto& priority_vehicle = *std::find_if(vehicles.begin(), vehicles.end(), [&vehicles](const auto& v){
+            return tutils::get_vehicle(vehicles, v, Side::Right) == VinFlags::Invalid;
+        });
+
+        return priority_vehicle.indicator_state != (int)Indicator::Left;
+    });
+
+    m_dtree->yes->no->yes = std::make_shared<cf::TreeNode<DecisionData>>(Scenario::S2);
+
+    m_dtree->yes->no->no = std::make_shared<cf::TreeNode<DecisionData>>([](const DecisionData& data){
+        // street left of priority vehicle is small?
+        const auto& vehicles = data.first;
+        const auto& priority_vehicle = *std::find_if(vehicles.begin(), vehicles.end(), [&vehicles](const auto& v){
+            return tutils::get_vehicle(vehicles, v, Side::Right) == VinFlags::Invalid;
+        });
+
+        const auto street_id = tutils::get_street(priority_vehicle);
+        const auto street_id_left = tutils::get_street(street_id, Side::Left);
+
+        return data.second.streets[street_id_left].width < 2;
+    });
+
+    m_dtree->yes->no->no->no = std::make_shared<cf::TreeNode<DecisionData>>(Scenario::S2);
+
+    m_dtree->yes->no->no->yes = std::make_shared<cf::TreeNode<DecisionData>>([](const DecisionData& data){
+        // is a vehicle to the left of the priority vehicle?
+        const auto& vehicles = data.first;
+        const auto& priority_vehicle = *std::find_if(vehicles.begin(), vehicles.end(), [&vehicles](const auto& v){
+            return tutils::get_vehicle(vehicles, v, Side::Right) == VinFlags::Invalid;
+        });
+
+        return tutils::get_vehicle(vehicles, priority_vehicle, Side::Left) != VinFlags::Invalid;
+    });
+
+    m_dtree->yes->no->no->no->no = std::make_shared<cf::TreeNode<DecisionData>>(Scenario::S2);
+    m_dtree->yes->no->no->no->yes = std::make_shared<cf::TreeNode<DecisionData>>(Scenario::S2);
 }
 
 Scenario ScenarioDetector::decision_tree(const DecisionData& data) const
