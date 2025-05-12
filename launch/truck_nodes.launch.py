@@ -13,16 +13,16 @@ def generate_launch_description():
             name=node_name,
             parameters=[{
                 'vin': truck_id,
-                'engine_state' : vehicle['engine'],
-                    'speed': vehicle['speed'],
+                'engine_state' : 0,
+                    'speed': 0.0,
                     'indicator_state': vehicle['indicator'],
                     'position_x': vehicle['position_x'],
                     'position_y': vehicle['position_y'],
                     'position_z': vehicle['position_z'],
-                    'direction': vehicle['direction_angle']
-                    'is_simulated': True
+                    'direction': vehicle['direction_angle'],
+                    'is_simulated': True,
                     'scenario_detector': 0, # Hardcode
-                    'decision_algorithm': 0,
+                    'decision_algorithm': 0
                 }],
                 arguments=['--ros-args', '--log-level', 'INFO']
         )

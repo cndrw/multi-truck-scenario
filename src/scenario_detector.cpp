@@ -404,8 +404,8 @@ void ScenarioDetector::init_decision_tree()
         return tutils::get_vehicle(vehicles, priority_vehicle, Side::Left) != VinFlags::Invalid;
     });
 
-    m_dtree->yes->no->no->no->no = std::make_shared<cf::TreeNode<DecisionData>>(Scenario::S2);
-    m_dtree->yes->no->no->no->yes = std::make_shared<cf::TreeNode<DecisionData>>(Scenario::S2);
+    m_dtree->yes->no->no->yes->no = std::make_shared<cf::TreeNode<DecisionData>>(Scenario::S2);
+    m_dtree->yes->no->no->yes->yes = std::make_shared<cf::TreeNode<DecisionData>>(Scenario::S1);
 }
 
 Scenario ScenarioDetector::decision_tree(const DecisionData& data) const

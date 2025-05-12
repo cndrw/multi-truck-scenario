@@ -104,6 +104,7 @@ private:
         m_vin = this->get_parameter("vin").as_int();
         m_speed = this->get_parameter("speed").as_double();
         m_indicator_state = (Indicator)this->get_parameter("indicator_state").as_int();
+        RCLCPP_INFO(get_logger(), "init indicator: %d", m_indicator_state);
         m_engine_state = (Engine)this->get_parameter("engine_state").as_int();
 
     }

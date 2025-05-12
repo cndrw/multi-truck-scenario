@@ -98,7 +98,7 @@ def generate_launch_description():
                     'position_y': vehicle['position_y'],
                     'position_z': vehicle['position_z'],
                     'direction': vehicle['direction_angle'],
-                    'is_simulated': True
+                    'is_simulated': True,
                     'scenario_detector': 0, # Hardcode
                     'decision_algorithm': 0,
                 }],
