@@ -50,7 +50,7 @@ def generate_launch_description():
                 'street_width_bottom': width_street_bottom,
             }],
             arguments=['--ros-args', '--log-level', 'INFO']
-        )
+        ),
 
         Node(
             package='rviz2',

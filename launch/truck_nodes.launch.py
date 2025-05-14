@@ -15,11 +15,11 @@ def generate_launch_description():
                 'vin': truck_id,
                 'engine_state' : 0,
                     'speed': 0.0,
-                    'indicator_state': vehicle['indicator'],
-                    'position_x': vehicle['position_x'],
-                    'position_y': vehicle['position_y'],
-                    'position_z': vehicle['position_z'],
-                    'direction': vehicle['direction_angle'],
+                    'indicator_state': 0,
+                    'position_x': 0,
+                    'position_y': 0,
+                    'position_z': 0,
+                    'direction': 0,
                     'is_simulated': True,
                     'scenario_detector': 0, # Hardcode
                     'decision_algorithm': 0
