@@ -9,9 +9,14 @@
 #include "rclcpp/rclcpp.hpp"
 #include "nav_msgs/msg/occupancy_grid.hpp"
 #include "geometry_msgs/msg/point_stamped.hpp"
+#include "geometry_msgs/msg/pose_with_covariance_stamped.hpp"
+
 #include "multi_truck_scenario/msg/vehicle_base_data.hpp"
 #include "multi_truck_scenario/msg/solution.hpp"
 #include "multi_truck_scenario/msg/detection_proposal.hpp"
+
+#include "truck_msgs/srv/zf_set_control_limits.hpp"
+#include "truck_msgs/msg/zf_truck_init.hpp"
 
 #include "scenario_solver.hpp"
 #include "scenario_detector.hpp"
@@ -65,6 +70,20 @@ public:
         m_vehicle_update = this->create_wall_timer(
             m_system_update_period, std::bind(&Vehicle::update, this)
         );
+
+        m_truck_init_pub = this->create_publisher<truck_msgs::msg::ZfTruckInit>("truck_init", 10);
+
+        m_odometry_sub = this->create_subscription<geometry_msgs::msg::PoseWithCovarianceStamped>(
+            "odometry_encoder_diff", 10, std::bind(&Vehicle::truck_odometry_callback, this, std::placeholders::_1)
+        );
+
+
+        // init zf truck 
+        auto init_msg = truck_msgs::msg::ZfTruckInit();
+        init_msg.psi = m_direction;
+        init_msg.x = m_position.point.x;
+        init_msg.y = m_position.point.y;
+        m_truck_init_pub->publish(init_msg);
     }
 
     ~Vehicle() {}
@@ -139,8 +158,7 @@ private:
         if (res.first == Scenario::None)
         {
             if (!m_driving_permission) RCLCPP_INFO(get_logger(), "No scenario found - grant driving permission");
-            m_driving_permission = true;
-            m_speed = 1.0;
+            set_driving_permission(true);
             return;
         }
 
@@ -192,6 +210,47 @@ private:
         last_time = now_time;
     }
 
+    void set_driving_permission(const bool value)
+    {
+        m_driving_permission = value;
+        // /odometry/encoder
+        m_speed = static_cast<double>(value);
+
+        if (m_is_simulated)
+        {
+            return;
+        }
+
+        const auto client = create_client<truck_msgs::srv::ZfSetControlLimits>("set_control_limits");
+
+        auto request = std::make_shared<truck_msgs::srv::ZfSetControlLimits::Request>();
+        request->speed_max = (int)value * 50;
+
+        while (!client->wait_for_service(1s))
+        {
+            if (!rclcpp::ok())
+            {
+                RCLCPP_ERROR(get_logger(), "Interrupted while waiting for the service. Exiting.");
+                return;
+            }
+            RCLCPP_INFO(get_logger(), "service not available, waiting again...");
+        }
+
+        auto result = client->async_send_request(request);
+
+        // Wait for the result.
+        auto status = rclcpp::spin_until_future_complete(this->get_node_base_interface(), result);
+
+        if (status == rclcpp::FutureReturnCode::SUCCESS)
+        {
+            RCLCPP_INFO(get_logger(), "set control succesfull");
+        }
+        else
+        {
+            RCLCPP_ERROR(this->get_logger(), "Failed to call service add_two_ints");
+        }
+    }
+
 
     void vehicle_position_callback(const mts_msgs::VehicleBaseData::SharedPtr vehicle_data)
     {
@@ -233,6 +292,13 @@ private:
         {
             m_nearby_vehicles.emplace(key, vehicle_data);
         }
+    }
+
+    void truck_odometry_callback(const geometry_msgs::msg::PoseWithCovarianceStamped::SharedPtr odometry)
+    {
+        m_position.point = odometry->pose.pose.position;
+        // theoretisch m_direction = odometry->pose.pose.orientation
+        // aber orientation ist in quaternionen und m_direction in grad
     }
 
     bool vehicle_standard_filter(const mts_msgs::VehicleBaseData::SharedPtr vehicle_data)
@@ -335,12 +401,11 @@ private:
                 {
                     RCLCPP_INFO(this->get_logger(), "Vehicle %d obtained driving permission", m_vin);
                     // grant driving permission 
-                    m_driving_permission = true;
-                    m_speed = 1.0;
+                    set_driving_permission(true);
                 }
                 else 
                 {
-                    m_driving_permission = false;
+                    set_driving_permission(false);
                 }
             }
 
@@ -405,6 +470,9 @@ private:
     rclcpp::Publisher<mts_msgs::Solution>::SharedPtr m_solution_pub;
     rclcpp::Subscription<mts_msgs::Solution>::SharedPtr m_solution_sub;
     std::vector<int> m_solution_vins;
+
+    rclcpp::Publisher<truck_msgs::msg::ZfTruckInit>::SharedPtr m_truck_init_pub;
+    rclcpp::Subscription<geometry_msgs::msg::PoseWithCovarianceStamped>::SharedPtr m_odometry_sub;
 
     ScenarioSolver m_scenario_solver;
     ScenarioDetector m_scenario_detector;
