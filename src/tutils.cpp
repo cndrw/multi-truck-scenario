@@ -47,6 +47,32 @@ geometry_msgs::msg::Point add(const geometry_msgs::msg::Point &p1, const double 
     return p;
 }
 
+geometry_msgs::msg::Point add(const geometry_msgs::msg::Point &p1, const double x, const double y, const double z)
+{
+    auto p = geometry_msgs::msg::Point();
+    p.x = p1.x + x;
+    p.y = p1.y + y;
+    p.z = p1.z + z;
+    return p;
+}
+
+geometry_msgs::msg::Point multiply(const geometry_msgs::msg::Point &p1, const double factor)
+{
+    auto p = geometry_msgs::msg::Point();
+    p.x = p1.x * factor;
+    p.y = p1.y * factor;
+    p.z = p1.z * factor;
+    return p;
+}
+
+double norm_angle(double angle)
+{
+    double result = std::fmod(angle, 360.0);
+    if (result < 0) result += 360.0; // für negative Werte absichern
+    return result;
+
+}
+
 int get_vehicle(const std::vector<mts_msgs::VehicleBaseData>& vehicles, const mts_msgs::VehicleBaseData& vehicle, Side side)
 {
     int winner_vin = VinFlags::Invalid;

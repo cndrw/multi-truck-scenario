@@ -44,6 +44,22 @@ namespace tutils {
         const double factor
     );
 
+    geometry_msgs::msg::Point add(
+        const geometry_msgs::msg::Point& p1,
+        const double x,
+        const double y,
+        const double z
+    );
+
+    geometry_msgs::msg::Point multiply(
+        const geometry_msgs::msg::Point& p1,
+        const double factor
+    );
+
+    // return the given angle as angle between 0-360
+    double norm_angle(double angle);
+
+
     int get_vehicle(const std::vector<mts_msgs::VehicleBaseData>& vehicles, const mts_msgs::VehicleBaseData& vehicle, Side side);
     bool is_opposite(float alpha, float beta);
     int get_street(const mts_msgs::VehicleBaseData& vehicle);

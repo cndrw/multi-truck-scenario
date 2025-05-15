@@ -9,6 +9,8 @@ Panels:
         - /Marker1
         - /Marker1/Namespaces1
         - /MarkerArray1
+        - /Marker3
+        - /Marker4
       Splitter Ratio: 0.5
     Tree Height: 475
   - Class: rviz_common/Selection
@@ -69,9 +71,7 @@ Visualization Manager:
       Enabled: true
       Name: Marker
       Namespaces:
-        1: true
-        2: true
-        3: true
+        {}
       Topic:
         Depth: 5
         Durability Policy: Volatile
@@ -95,13 +95,63 @@ Visualization Manager:
       Enabled: true
       Name: Marker
       Namespaces:
-        arrows: true
+        {}
       Topic:
         Depth: 5
         Durability Policy: Volatile
         History Policy: Keep Last
         Reliability Policy: Reliable
         Value: /arrow_dta
+      Value: true
+    - Class: rviz_default_plugins/Marker
+      Enabled: true
+      Name: Marker
+      Namespaces:
+        {}
+      Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /indicator_dta
+      Value: true
+    - Class: rviz_default_plugins/Marker
+      Enabled: true
+      Name: Marker
+      Namespaces:
+        {}
+      Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /indicator_left_dta
+      Value: true
+    - Class: rviz_default_plugins/Marker
+      Enabled: true
+      Name: Marker
+      Namespaces:
+        {}
+      Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /indicator_right_dta
+      Value: true
+    - Class: rviz_default_plugins/MarkerArray
+      Enabled: true
+      Name: MarkerArray
+      Namespaces:
+        arrows_: true
+        vehicle_base_: true
+        vehicle_indicator_: true
+      Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /vehicle_vis_dta
       Value: true
   Enabled: true
   Global Options:
@@ -161,10 +211,10 @@ Visualization Manager:
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 0.5503985285758972
+      Pitch: 0.6453984379768372
       Target Frame: <Fixed Frame>
       Value: ThirdPersonFollower (rviz_default_plugins)
-      Yaw: 4.303582668304443
+      Yaw: 4.883565425872803
     Saved: ~
 Window Geometry:
   Displays:
