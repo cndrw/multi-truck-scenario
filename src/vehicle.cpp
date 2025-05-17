@@ -9,9 +9,14 @@
 #include "rclcpp/rclcpp.hpp"
 #include "nav_msgs/msg/occupancy_grid.hpp"
 #include "geometry_msgs/msg/point_stamped.hpp"
+#include "geometry_msgs/msg/pose_with_covariance_stamped.hpp"
+
 #include "multi_truck_scenario/msg/vehicle_base_data.hpp"
 #include "multi_truck_scenario/msg/solution.hpp"
 #include "multi_truck_scenario/msg/detection_proposal.hpp"
+
+#include "truck_msgs/srv/zf_set_control_limits.hpp"
+#include "truck_msgs/msg/zf_truck_init.hpp"
 
 #include "scenario_solver.hpp"
 #include "scenario_detector.hpp"
@@ -20,7 +25,6 @@
 using namespace std::chrono_literals;
 namespace mts_msgs = multi_truck_scenario::msg;
 
-enum class Indicator { off, left, right, warning };
 enum class Engine { on, off };
 
 class Vehicle : public rclcpp::Node
@@ -66,6 +70,20 @@ public:
         m_vehicle_update = this->create_wall_timer(
             m_system_update_period, std::bind(&Vehicle::update, this)
         );
+
+        m_truck_init_pub = this->create_publisher<truck_msgs::msg::ZfTruckInit>("truck_init", 10);
+
+        m_odometry_sub = this->create_subscription<geometry_msgs::msg::PoseWithCovarianceStamped>(
+            "odometry_encoder_diff", 10, std::bind(&Vehicle::truck_odometry_callback, this, std::placeholders::_1)
+        );
+
+
+        // init zf truck 
+        auto init_msg = truck_msgs::msg::ZfTruckInit();
+        init_msg.psi = m_direction;
+        init_msg.x = m_position.point.x;
+        init_msg.y = m_position.point.y;
+        m_truck_init_pub->publish(init_msg);
     }
 
     ~Vehicle() {}
@@ -78,6 +96,8 @@ public:
 private:
     void handle_parameters()
     {
+        this->declare_parameter("is_simulated", true);
+
         this->declare_parameter("position_x", 0.0);
         this->declare_parameter("position_y", 0.0);
         this->declare_parameter("position_z", 0.0);
@@ -89,6 +109,8 @@ private:
         
         this->declare_parameter("scenario_detector", 0);
         this->declare_parameter("decision_algorithm", 0);
+
+        m_is_simulated = this->get_parameter("is_simulated").as_bool();
         
         m_position.point.x = this->get_parameter("position_x").as_double();
         m_position.point.y = this->get_parameter("position_y").as_double();
@@ -101,7 +123,9 @@ private:
         m_vin = this->get_parameter("vin").as_int();
         m_speed = this->get_parameter("speed").as_double();
         m_indicator_state = (Indicator)this->get_parameter("indicator_state").as_int();
+        RCLCPP_INFO(get_logger(), "init indicator: %d", m_indicator_state);
         m_engine_state = (Engine)this->get_parameter("engine_state").as_int();
+
     }
 
     void update()
@@ -117,6 +141,10 @@ private:
             return;
         }
 
+        if (m_solution_delay - this->now().seconds() > 0)
+        {
+            return;
+        }
 
         std::vector<mts_msgs::VehicleBaseData> tmp;
         tmp.reserve(m_nearby_vehicles.size());
@@ -125,17 +153,22 @@ private:
             tmp.push_back(*v.second);
         }
 
-        if (tmp.size() != 0)
+        // check scenario
+        const auto res = m_scenario_detector.check(tmp);
+        if (res.first == Scenario::None)
         {
-            const auto res = m_scenario_detector.check(tmp);
-            for (const auto& v : res.second)
-            {
-                m_proposal_vehicles.emplace(v.vin, v);
-            }
-
-            m_detected_scenario = res.first;
-            send_scenario_proposal(m_detected_scenario);
+            if (!m_driving_permission) RCLCPP_INFO(get_logger(), "No scenario found - grant driving permission");
+            set_driving_permission(true);
+            return;
         }
+
+        for (const auto& v : res.second)
+        {
+            m_proposal_vehicles.emplace(v.vin, v);
+        }
+
+        m_detected_scenario = res.first;
+        send_scenario_proposal(m_detected_scenario);
 
         m_nearby_vehicles.clear();
     }
@@ -163,15 +196,59 @@ private:
         const auto now_time = this->get_clock()->now();
         const auto delta_time = now_time - last_time;
 
-        // get driving direction
-        const double dy = std::sin(m_direction * tutils::DEG2RAD);
-        const double dx = std::cos(m_direction * tutils::DEG2RAD);
+        if (m_driving_permission && m_is_simulated)
+        {
+            // get driving direction
+            const double dy = std::sin(m_direction * tutils::DEG2RAD);
+            const double dx = std::cos(m_direction * tutils::DEG2RAD);
 
-        const double delta_move = m_speed * delta_time.seconds();
-        m_position.point.x += delta_move * dx;
-        m_position.point.y += delta_move * dy;
+            const double delta_move = m_speed * delta_time.seconds();
+            m_position.point.x += delta_move * dx;
+            m_position.point.y += delta_move * dy;
+        }
 
         last_time = now_time;
+    }
+
+    void set_driving_permission(const bool value)
+    {
+        m_driving_permission = value;
+        // /odometry/encoder
+        m_speed = static_cast<double>(value);
+
+        if (m_is_simulated)
+        {
+            return;
+        }
+
+        const auto client = create_client<truck_msgs::srv::ZfSetControlLimits>("set_control_limits");
+
+        auto request = std::make_shared<truck_msgs::srv::ZfSetControlLimits::Request>();
+        request->speed_max = (int)value * 50;
+
+        while (!client->wait_for_service(1s))
+        {
+            if (!rclcpp::ok())
+            {
+                RCLCPP_ERROR(get_logger(), "Interrupted while waiting for the service. Exiting.");
+                return;
+            }
+            RCLCPP_INFO(get_logger(), "service not available, waiting again...");
+        }
+
+        auto result = client->async_send_request(request);
+
+        // Wait for the result.
+        auto status = rclcpp::spin_until_future_complete(this->get_node_base_interface(), result);
+
+        if (status == rclcpp::FutureReturnCode::SUCCESS)
+        {
+            RCLCPP_INFO(get_logger(), "set control succesfull");
+        }
+        else
+        {
+            RCLCPP_ERROR(this->get_logger(), "Failed to call service add_two_ints");
+        }
     }
 
 
@@ -204,7 +281,7 @@ private:
             return;
         }
 
-        if (m_solution_delay - this->get_clock()->now().seconds() > 0)
+        if (m_solution_delay - this->now().seconds() > 0)
         {
             return;
         }
@@ -215,6 +292,13 @@ private:
         {
             m_nearby_vehicles.emplace(key, vehicle_data);
         }
+    }
+
+    void truck_odometry_callback(const geometry_msgs::msg::PoseWithCovarianceStamped::SharedPtr odometry)
+    {
+        m_position.point = odometry->pose.pose.position;
+        // theoretisch m_direction = odometry->pose.pose.orientation
+        // aber orientation ist in quaternionen und m_direction in grad
     }
 
     bool vehicle_standard_filter(const mts_msgs::VehicleBaseData::SharedPtr vehicle_data)
@@ -311,11 +395,18 @@ private:
         {
             m_solution_delay = this->get_clock()->now().seconds() + m_delay_time;
 
-            if (compare_solutions(m_solution_buffer) && solution->winner_vin == m_vin)
+            if (const auto res = compare_solutions(m_solution_buffer))
             {
-                RCLCPP_INFO(this->get_logger(), "Vehicle %d obtained driving permission", m_vin);
-                // grant driving permission 
-                m_speed = 1.0;
+                if (res->winner_vin == m_vin)
+                {
+                    RCLCPP_INFO(this->get_logger(), "Vehicle %d obtained driving permission", m_vin);
+                    // grant driving permission 
+                    set_driving_permission(true);
+                }
+                else 
+                {
+                    set_driving_permission(false);
+                }
             }
 
             m_nearby_vehicles.clear();
@@ -324,33 +415,38 @@ private:
         }
     }
 
-    bool compare_solutions(const std::vector<mts_msgs::Solution>& solutions)
+    std::unique_ptr<mts_msgs::Solution> compare_solutions(const std::vector<mts_msgs::Solution>& solutions)
     {
-        const auto it = std::find_if(solutions.begin(), solutions.end(), [](const mts_msgs::Solution& s) {
+        const auto it = std::find_if(solutions.begin(), solutions.end(), [this](const mts_msgs::Solution& s) {
             return s.winner_vin != VinFlags::Ignored;
         });
 
         // every vin is "ignored" -> no solution possible
         if (it == solutions.end())
         {
-            return false;
+            return nullptr;
         }
 
-        const auto reference = *it;
+        const auto& reference = *it;
 
         // check if all winner vins are the same
-        return std::all_of(solutions.begin(), solutions.end(), [=](const mts_msgs::Solution& s) {
+        bool all_equal = std::all_of(solutions.begin(), solutions.end(), [=](const mts_msgs::Solution& s) {
             return s.winner_vin == reference.winner_vin || s.winner_vin == VinFlags::Ignored;
         });
+
+        return all_equal ? std::make_unique<mts_msgs::Solution>(reference) : nullptr;
     }
 
     bool m_is_active = true;
+    bool m_driving_permission = false;
+    bool m_is_simulated = true;
+
     // base package informations
     double m_speed;
     double m_direction;
     int m_vin;
     geometry_msgs::msg::PointStamped m_position;
-    Indicator m_indicator_state = Indicator::off;
+    Indicator m_indicator_state = Indicator::Off;
     Engine m_engine_state = Engine::on;
 
     rclcpp::TimerBase::SharedPtr m_vehicle_update;
@@ -359,6 +455,7 @@ private:
     const std::chrono::seconds m_system_update_period = 1s;
     const std::chrono::milliseconds m_msg_send_period = 500ms;
     const std::chrono::milliseconds m_vehicle_move_period = 300ms;
+
     std::unordered_map<int, mts_msgs::VehicleBaseData::SharedPtr> m_nearby_vehicles;
     rclcpp::Publisher<mts_msgs::VehicleBaseData>::SharedPtr m_vehicle_pub;
     rclcpp::Subscription<mts_msgs::VehicleBaseData>::SharedPtr m_vehicle_sub;
@@ -369,11 +466,13 @@ private:
     rclcpp::Publisher<mts_msgs::DetectionProposal>::SharedPtr m_dproposal_pub;
     rclcpp::Subscription<mts_msgs::DetectionProposal>::SharedPtr m_dproposal_sub;
 
-
     std::vector<mts_msgs::Solution> m_solution_buffer;
     rclcpp::Publisher<mts_msgs::Solution>::SharedPtr m_solution_pub;
     rclcpp::Subscription<mts_msgs::Solution>::SharedPtr m_solution_sub;
     std::vector<int> m_solution_vins;
+
+    rclcpp::Publisher<truck_msgs::msg::ZfTruckInit>::SharedPtr m_truck_init_pub;
+    rclcpp::Subscription<geometry_msgs::msg::PoseWithCovarianceStamped>::SharedPtr m_odometry_sub;
 
     ScenarioSolver m_scenario_solver;
     ScenarioDetector m_scenario_detector;

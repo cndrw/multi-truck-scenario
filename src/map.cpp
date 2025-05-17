@@ -9,13 +9,13 @@
 #include "visualization_msgs/msg/marker.hpp"
 #include "visualization_msgs/msg/marker_array.hpp"
 
-
 #include "multi_truck_scenario/msg/vehicle_base_data.hpp"
 #include "multi_truck_scenario/srv/get_event_site_distance.hpp"
 #include "multi_truck_scenario/srv/get_event_site_id.hpp"
-#include "geometry_msgs/msg/point.hpp"
 #include "multi_truck_scenario/msg/solution.hpp"
+#include "multi_truck_scenario/msg/street_data.hpp"
 
+#include "tutils.h"
 #include "event_site.hpp"
 
 using namespace std::chrono_literals;
@@ -42,8 +42,15 @@ class Map : public rclcpp::Node
         m_static_map.reserve(m_height * m_width);
 
         m_grid_pub = this->create_publisher<nav_msgs::msg::OccupancyGrid>("map_data", 10);
-        m_cube_pub = this->create_publisher<visualization_msgs::msg::Marker>("cube_dta", 10);
+        // m_cube_pub = this->create_publisher<visualization_msgs::msg::Marker>("cube_dta", 10);
+        // m_indicator_left_pub = this->create_publisher<visualization_msgs::msg::Marker>("indicator_left_dta", 10);
+        // m_indicator_right_pub = this->create_publisher<visualization_msgs::msg::Marker>("indicator_right_dta", 10);
+        // m_arrow_pub = this->create_publisher<visualization_msgs::msg::Marker>("arrow_dta", 10);
         m_border_pub = this->create_publisher<visualization_msgs::msg::MarkerArray>("cube_dta_arr", 10);
+        rclcpp::QoS qos_settings(10);
+        qos_settings.transient_local().reliable();
+
+        m_vehicle_vis_pub = this->create_publisher<visualization_msgs::msg::MarkerArray>("vehicle_vis_dta", qos_settings);
 
         m_timer = this->create_wall_timer(
             send_frequenzy, std::bind(&Map::timer_callback, this)
@@ -80,12 +87,31 @@ class Map : public rclcpp::Node
         this->declare_parameter<std::vector<int64_t>>("crossing_height_values", {});
         this->declare_parameter<std::vector<int64_t>>("crossing_bot_left_x_values", {});
         this->declare_parameter<std::vector<int64_t>>("crossing_bot_left_y_values", {});
+        this->declare_parameter<std::vector<int64_t>>("street_width_left", {});
+        this->declare_parameter<std::vector<int64_t>>("street_width_right", {});
+        this->declare_parameter<std::vector<int64_t>>("street_width_top", {});
+        this->declare_parameter<std::vector<int64_t>>("street_width_bottom", {});
 
         const auto width_values = this->get_parameter("crossing_width_values").as_integer_array();
         const auto height_values = this->get_parameter("crossing_height_values").as_integer_array();
         const auto bot_left_x_values = this->get_parameter("crossing_bot_left_x_values").as_integer_array();
         const auto bot_left_y_values = this->get_parameter("crossing_bot_left_y_values").as_integer_array();
-        
+        const auto street_width_left = this->get_parameter("street_width_left").as_integer_array();
+        const auto street_width_right = this->get_parameter("street_width_right").as_integer_array();
+        const auto street_width_top = this->get_parameter("street_width_top").as_integer_array();
+        const auto street_width_bottom = this->get_parameter("street_width_bottom").as_integer_array();
+
+        // Set content of struct Street
+        size_t num_streets = street_width_left.size();
+        if (street_width_right.size() != num_streets ||
+            street_width_top.size() != num_streets ||
+            street_width_bottom.size() != num_streets) 
+        {
+            RCLCPP_ERROR(this->get_logger(), "Mismatch in size of street parameter arrays!");
+            return;
+        }
+
+        // Set content of struct EventSite
         size_t num_sites = width_values.size();
         if (height_values.size() != num_sites || 
         bot_left_x_values.size() != num_sites || 
@@ -102,7 +128,26 @@ class Map : public rclcpp::Node
             site.position.x = bot_left_x_values[i];
             site.position.y = bot_left_y_values[i];
             site.position.z = 0.0; // Assuming z is always 0 for the event site
+            site.streets = { // Assuming 4 streets for each event site
+              Street{static_cast<int>(street_width_left[i])},
+              Street{static_cast<int>(street_width_right[i])},
+              Street{static_cast<int>(street_width_top[i])},
+              Street{static_cast<int>(street_width_bottom[i])}
+            };
             m_event_sites.emplace(i, site);
+            RCLCPP_INFO(this->get_logger(), 
+                "EventSite %zu: pos=(%.1f, %.1f), size=(%d x %d), Streets [L=%d, R=%d, T=%d, B=%d]", 
+                i,
+               site.position.x,
+               site.position.y,
+               site.width,
+               site.height,
+               site.streets[0].width,
+               site.streets[1].width,
+               site.streets[2].width,
+               site.streets[3].width
+              );
+
         }
     }
 
@@ -163,7 +208,7 @@ class Map : public rclcpp::Node
     visualization_msgs::msg::Marker draw_border_block(const float x, const float y, const float height, const int id)
     {
       auto cube = visualization_msgs::msg::Marker();
-      cube.header.stamp = rclcpp::Clock().now();
+      cube.header.stamp = this->now();
       cube.header.frame_id = "map_frame";
       cube.action = visualization_msgs::msg::Marker::ADD;
       cube.type = visualization_msgs::msg::Marker::CUBE;
@@ -182,54 +227,184 @@ class Map : public rclcpp::Node
       return cube;
     }
 
-    void draw_car(float x, float y, int id)
+    void draw_vehicle(const mts_msgs::VehicleBaseData::SharedPtr vehicle)
+    {
+        const auto time_stamp = this->now();
+        const auto& pos = vehicle->position.point;
+        const auto vin = vehicle->vin;
+        const auto heading = vehicle->direction;
+        const auto indicator = static_cast<Indicator>(vehicle->indicator_state);
+
+        draw_vehicle_base(pos, vin, time_stamp);
+        draw_indicator(pos, heading, indicator, vin, time_stamp);
+        draw_heading_arrow(pos, heading, vin, time_stamp);
+
+        m_vehicle_vis_pub->publish(m_vehicle_vis);
+        m_vehicle_vis.markers.clear();
+    }
+
+    void draw_vehicle_base(const geometry_msgs::msg::Point& pos, const int vin, rclcpp::Time time_stamp)
     {
       auto cube = visualization_msgs::msg::Marker();
-      cube.header.stamp = rclcpp::Clock().now();
+      cube.header.stamp = time_stamp;
       cube.header.frame_id = "map_frame";
       cube.action = visualization_msgs::msg::Marker::ADD;
       cube.type = visualization_msgs::msg::Marker::CUBE;
-      cube.ns = std::to_string(id);
-      cube.pose.position.x = 0.5 + x;
-      cube.pose.position.y = 0.5 + y;
+      cube.ns = "vehicle_base_";
+      cube.id = vin;
+      cube.pose.position.x = 0.5 + pos.x;
+      cube.pose.position.y = 0.5 + pos.y;
       cube.pose.position.z = 0.5;
-      cube.color = m_car_visuals[id];
+      cube.color = m_car_visuals[vin];
       cube.scale.x = 1.0;
       cube.scale.y = 1.0;
       cube.color.a = 1.0;
       cube.scale.z = 1.0;
       cube.lifetime = rclcpp::Duration(2, 0);
-      m_cube_pub->publish(cube);
+      // m_cube_pub->publish(cube);
+      m_vehicle_vis.markers.push_back(cube);
+    }
+
+    void draw_indicator(
+        const geometry_msgs::msg::Point& pos,
+        const float heading,
+        const Indicator indicator,
+        const int vin,
+        rclcpp::Time time_stamp)
+    {
+        auto cube = visualization_msgs::msg::Marker();
+        cube.header.stamp = time_stamp;
+        cube.header.frame_id = "map_frame";
+        cube.action = visualization_msgs::msg::Marker::ADD;
+        cube.type = visualization_msgs::msg::Marker::CUBE;
+        cube.ns = "vehicle_indicator_";
+        cube.id = vin;
+
+        auto heading_vec = geometry_msgs::msg::Point();
+        heading_vec.x = std::cos(heading * tutils::DEG2RAD);
+        heading_vec.y = std::sin(heading * tutils::DEG2RAD);
+        heading_vec = tutils::multiply(heading_vec, 0.5);
+
+        heading_vec.x += pos.x + 0.5;
+        heading_vec.y += pos.y + 0.5;
+
+        // auto front_point = tutils::add(cube.pose.position, heading_vec);
+        auto front_point = heading_vec;
+
+        auto indicator_point = geometry_msgs::msg::Point();
+        indicator_point.x = std::cos((heading + 90) * tutils::DEG2RAD);
+        indicator_point.y = std::sin((heading + 90) * tutils::DEG2RAD);
+        indicator_point = tutils::multiply(indicator_point, 0.35);
+
+        cube.pose.position = tutils::add(front_point, indicator_point);
+        cube.pose.position.z = 0.5;
+
+
+        set_indicator_color(cube.color, indicator == Indicator::Left);
+
+        cube.scale.x = 0.2;
+        cube.scale.y = 0.2;
+        cube.scale.z = 0.2;
+        cube.lifetime = rclcpp::Duration(2, 0);
+        
+        m_vehicle_vis.markers.push_back(cube);
+
+        // right indiactor
+        cube.id = vin + 100;
+        indicator_point.x = std::cos((heading - 90) * tutils::DEG2RAD);
+        indicator_point.y = std::sin((heading - 90) * tutils::DEG2RAD);
+        indicator_point = tutils::multiply(indicator_point, 0.35);
+
+        cube.pose.position = tutils::add(front_point, indicator_point);
+        cube.pose.position.z = 0.5;
+
+        set_indicator_color(cube.color, indicator == Indicator::Right);
+        m_vehicle_vis.markers.push_back(cube);
+    }
+
+    void set_indicator_color(std_msgs::msg::ColorRGBA& color_property, const bool is_on)
+    {
+        constexpr float color_on[] = { 0.958, 0.879, 0.311 };
+        constexpr float color_off[] = { 0.819, 0.361, 0.103 };
+        RCLCPP_INFO(get_logger(), "is on: %d", is_on);
+
+        if (!is_on)
+        {
+            color_property.r = color_off[0];
+            color_property.g = color_off[1];
+            color_property.b = color_off[2];
+            color_property.a = 1.0;
+            return;
+        }
+        // else is on
+
+        color_property.r = color_on[0];
+        color_property.g = color_on[1];
+        color_property.b = color_on[2];
+        color_property.a = 1.0;
+    }
+
+    void draw_heading_arrow(const geometry_msgs::msg::Point& pos, float heading, int id, rclcpp::Time time_stamp)
+    {
+        auto marker = visualization_msgs::msg::Marker();
+        marker.header.frame_id = "map_frame";
+        marker.header.stamp = time_stamp;
+        marker.ns = "arrows_";
+        marker.id = id;
+        marker.type = visualization_msgs::msg::Marker::ARROW;
+        marker.action = visualization_msgs::msg::Marker::ADD;
+
+        auto end = geometry_msgs::msg::Point();
+        end.x = std::cos(heading * tutils::DEG2RAD);
+        end.y = std::sin(heading * tutils::DEG2RAD);
+        end.z = 0.0;
+
+        auto mid_point = tutils::add(pos, 0.5);
+
+        marker.points.push_back(mid_point);
+        marker.points.push_back(tutils::add(mid_point, end));
+
+        marker.scale.x = 0.1;  // Schaftdurchmesser
+        marker.scale.y = 0.2;   // Pfeilkopfdurchmesser
+        marker.scale.z = 0.2;   // Pfeilkopflänge
+
+        marker.color.r = 1.0f;
+        marker.color.g = 0.0f;
+        marker.color.b = 0.0f;
+        marker.color.a = 1.0;
+
+        marker.lifetime = rclcpp::Duration(2, 0);
+        // m_arrow_pub->publish(marker);
+        m_vehicle_vis.markers.push_back(marker);
     }
 
     void timer_callback()
     {
+        auto grid = nav_msgs::msg::OccupancyGrid();
+        grid.info.height = m_height;
+        grid.info.width = m_width;
+        grid.info.resolution = m_resolution;
 
-      auto grid = nav_msgs::msg::OccupancyGrid();
-      grid.info.height = m_height;
-      grid.info.width = m_width;
-      grid.info.resolution = m_resolution;
+        grid.header.stamp = rclcpp::Clock().now();
+        grid.header.frame_id = "map_frame";
 
-      grid.header.stamp = rclcpp::Clock().now();
-      grid.header.frame_id = "map_frame";
+        grid.info.origin.position.x = 0;
+        grid.info.origin.position.y = 0;
+        grid.info.origin.position.z = 0;
+        grid.info.origin.orientation.x = 0;
+        grid.info.origin.orientation.y = 0;
+        grid.info.origin.orientation.z = 0;
+        grid.info.origin.orientation.w = 1;
 
-      grid.info.origin.position.x = 0;
-      grid.info.origin.position.y = 0;
-      grid.info.origin.position.z = 0;
-      grid.info.origin.orientation.x = 0;
-      grid.info.origin.orientation.y = 0;
-      grid.info.origin.orientation.z = 0;
-      grid.info.origin.orientation.w = 1;
+        add_to_map(m_static_map);
+        draw_border();
 
-      add_to_map(m_static_map);
-      draw_border();
-   
-      grid.data = m_grid;
-    
+        grid.data = m_grid;
 
-      m_grid_pub->publish(grid);
 
-      clear_map();
+        m_grid_pub->publish(grid);
+
+        clear_map();
     }
 
     void vehicle_position_callback(const mts_msgs::VehicleBaseData::SharedPtr vehicle_data)
@@ -253,8 +428,7 @@ class Map : public rclcpp::Node
             m_vehicles[key] = vehicle_data;
         }
 
-        auto pos = vehicle_data->position.point;
-        draw_car(pos.x, pos.y, vehicle_data->vin);
+        draw_vehicle(vehicle_data);
     }
 
     bool is_out_of_bound(const geometry_msgs::msg::Point& pos)
@@ -285,8 +459,21 @@ class Map : public rclcpp::Node
         });
 
         response->id = sites[0].first;
-        response->event_site.position = sites[0].second.position;
-        response->event_site.num_streets = 4;
+
+        const auto& site = sites[0].second;
+        response->event_site.position = site.position;
+
+        int street_count = std::count_if(site.streets.begin(), site.streets.end(), [](const auto& s) {
+            return s.width != 0;
+        });
+        response->event_site.num_streets = street_count;
+
+        for (const auto& street : site.streets)
+        {
+            auto street_data = mts_msgs::StreetData();
+            street_data.width = street.width;
+            response->event_site.streets.push_back(street_data);
+        }
     }
 
     void get_event_site_distance(const mts_srvs::GetEventSiteDistance::Request::SharedPtr request,
@@ -350,7 +537,12 @@ class Map : public rclcpp::Node
     rclcpp::Service<mts_srvs::GetEventSiteDistance>::SharedPtr m_esite_dist_srv;
     rclcpp::Service<mts_srvs::GetEventSiteID>::SharedPtr m_esite_id_srv;
 
-    rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr m_cube_pub;
+    // rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr m_cube_pub;
+    // rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr m_indicator_left_pub;
+    // rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr m_indicator_right_pub;
+    // rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr m_arrow_pub;
+    rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr m_vehicle_vis_pub;
+    visualization_msgs::msg::MarkerArray m_vehicle_vis;
     rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr m_border_pub;
 };
 

@@ -33,7 +33,7 @@ std::unique_ptr<SolutionType> ScenarioSolver::solve(Scenario scenario, const std
             break;
 
         default:
-            RCLCPP_ERROR(m_logger, "Scenario solution not implemented yet");
+            RCLCPP_ERROR(m_logger, "Scenario solution not implemented yet %d", scenario);
             break;
     }
 
@@ -61,7 +61,7 @@ void ScenarioSolver::solve_s1()
         return v.vin == priority_car_vin;
     });
 
-    int upgraded_priority_car = get_vehicle(vehicle, Side::left);
+    int upgraded_priority_car = tutils::get_vehicle(m_vehicles, vehicle, Side::Left);
 
     m_solution.author_vin = m_owner_vin;
     m_solution.winner_vin = upgraded_priority_car;
@@ -80,66 +80,11 @@ void ScenarioSolver::solve_s2()
     }
 }
 
-int ScenarioSolver::get_vehicle(const mts_msgs::VehicleBaseData& vehicle, Side side)
-{
-    int winner_vin = VinFlags::Invalid;
-    constexpr auto reference_angle = 90.0;
-    const auto adjust_angle = reference_angle - vehicle.direction;
-
-    for (const auto& other : m_vehicles)
-    {
-        if (other == vehicle) continue;
-
-        if (is_opposite(vehicle.direction, other.direction))
-        {
-            continue;
-        }
-
-        // get direction vector from v1 to v2
-        const auto diff = tutils::substract(vehicle.position, other.position);
-        
-        // angle of the direction vector
-        auto diff_angle = std::atan2(diff.point.y, diff.point.x) * tutils::RAD2DEG;
-
-        diff_angle += adjust_angle; // also adjust the angle of the differenz vector
-
-        if (diff_angle < 0)
-        {
-            diff_angle += 360;
-        }
-
-        if (diff_angle >= 360)
-        {
-            diff_angle -= 360;
-        }
-
-        // determine on which side it is
-        bool result = diff_angle <= reference_angle;
-        if (side == Side::left)
-        {
-            result = !result;
-        }
-
-        if (result)
-        {
-            winner_vin = other.vin;
-        }
-    }
-
-    return winner_vin;
-
-}
-
-bool ScenarioSolver::is_opposite(float alpha, float beta) const
-{
-    return std::abs(std::abs(alpha - beta) - 180) < 10;
-}
-
 int ScenarioSolver::solve_uncontrolled_intersection()
 {
     for (const auto& vehicle: m_vehicles)
     {
-        if (get_vehicle(vehicle, Side::right) == VinFlags::Invalid)
+        if (tutils::get_vehicle(m_vehicles, vehicle, Side::Right) == VinFlags::Invalid)
         {
             m_solution.author_vin = m_owner_vin;
             return vehicle.vin;

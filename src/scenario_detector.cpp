@@ -46,6 +46,10 @@ ScenarioDetector::ScenarioDetector() : m_logger(rclcpp::get_logger("detector"))
 std::pair<Scenario, std::vector<mts_msgs::VehicleBaseData>>
 ScenarioDetector::check(const std::vector<mts_msgs::VehicleBaseData>& vehicles)
 {
+    if (vehicles.empty() || vehicles.size() == 1)
+    {
+        return {Scenario::None, vehicles};
+    }
     return {impl[m_implementation](vehicles), m_vehicles};
 }
 
@@ -112,8 +116,8 @@ Scenario ScenarioDetector::check_2(const std::vector<mts_msgs::VehicleBaseData>&
     });
 
     const auto event_site = get_event_site(owner_vehicle);
-    const auto site_id = event_site.first;
-    const auto site_data = event_site.second;
+    const auto& site_id = event_site.first;
+    const auto& site_data = event_site.second;
 
     for (const auto& vehicle : vehicles)
     {
@@ -130,24 +134,39 @@ Scenario ScenarioDetector::check_2(const std::vector<mts_msgs::VehicleBaseData>&
         }
         else if (vehicle.vin == m_owner_vin)
         {
-            RCLCPP_INFO(m_logger, "Vehicle %d is not involved in viewed scenario");
+            RCLCPP_INFO(m_logger, "Vehicle %d is not involved in viewed scenario", m_owner_vin);
             return Scenario::None;
         }
     }
 
-    if (invoveld_vehicles.empty())
+    if (invoveld_vehicles.empty() || invoveld_vehicles.size() == 1)
     {
-        RCLCPP_INFO(m_logger, "No Vehicle where involved in viewed scenario");
+        RCLCPP_INFO(m_logger, "Invalid amount of involved Vehicles in viewed Scenario (%d)", invoveld_vehicles.size());
         return Scenario::None;
     }
 
     auto sorted_vehicles = get_sorted_vehicles(invoveld_vehicles, site_id);
-    auto scenario = scenario_classification({sorted_vehicles, site_data});
-    m_vehicles = sorted_vehicles;
 
-    RCLCPP_INFO(m_logger, "Vehicle %d detected scenario: %d", m_owner_vin, scenario);
+    Scenario scenario_result = Scenario::None; 
+    for (size_t i = 2; i <= sorted_vehicles.size(); i++)
+    {
+        std::vector<mts_msgs::VehicleBaseData> sub(sorted_vehicles.begin(), sorted_vehicles.begin() + i);
+        const auto cur_scenario = scenario_classification({sub, site_data});
 
-    return scenario;
+        if (cur_scenario != Scenario::None)
+        {
+            scenario_result = cur_scenario;
+        }
+        else 
+        {
+            break;
+        }
+    }
+
+    m_vehicles = sorted_vehicles; // involved vehicles (final)
+    RCLCPP_INFO(m_logger, "Vehicle %d detected scenario: %d", m_owner_vin, scenario_result);
+
+    return scenario_result;
 }
 
 
@@ -337,19 +356,56 @@ Scenario ScenarioDetector::scenario_classification(const DecisionData& data)
 
 void ScenarioDetector::init_decision_tree()
 {
-    m_dtree = std::make_shared<cf::TreeNode<DecisionData>>([this](const DecisionData& data) {
+    m_dtree = std::make_shared<cf::TreeNode<DecisionData>>([](const DecisionData& data) {
         return data.second.num_streets > 2;
     });
 
     m_dtree->no = std::make_shared<cf::TreeNode<DecisionData>>(Scenario::None); // potential Scenario s3
 
-    m_dtree->yes = std::make_shared<cf::TreeNode<DecisionData>>([this](const DecisionData& data){
-        // temporary decision between S1 & S2 until the width of the streets is present
-        return data.first.size() > 2;
+    m_dtree->yes = std::make_shared<cf::TreeNode<DecisionData>>([](const DecisionData& data){
+        return data.first.size() == 4;
     });
 
     m_dtree->yes->yes = std::make_shared<cf::TreeNode<DecisionData>>(Scenario::S2);
-    m_dtree->yes->no = std::make_shared<cf::TreeNode<DecisionData>>(Scenario::S1);
+    m_dtree->yes->no = std::make_shared<cf::TreeNode<DecisionData>>([](const DecisionData& data){
+        // priority vehicle does NOT indicator left
+        const auto& vehicles = data.first;
+        const auto& priority_vehicle = *std::find_if(vehicles.begin(), vehicles.end(), [&vehicles](const auto& v){
+            return tutils::get_vehicle(vehicles, v, Side::Right) == VinFlags::Invalid;
+        });
+
+        return priority_vehicle.indicator_state != (int)Indicator::Left;
+    });
+
+    m_dtree->yes->no->yes = std::make_shared<cf::TreeNode<DecisionData>>(Scenario::S2);
+
+    m_dtree->yes->no->no = std::make_shared<cf::TreeNode<DecisionData>>([](const DecisionData& data){
+        // street left of priority vehicle is small?
+        const auto& vehicles = data.first;
+        const auto& priority_vehicle = *std::find_if(vehicles.begin(), vehicles.end(), [&vehicles](const auto& v){
+            return tutils::get_vehicle(vehicles, v, Side::Right) == VinFlags::Invalid;
+        });
+
+        const auto street_id = tutils::get_street(priority_vehicle);
+        const auto street_id_left = tutils::get_street(street_id, Side::Left);
+
+        return data.second.streets[street_id_left].width < 2;
+    });
+
+    m_dtree->yes->no->no->no = std::make_shared<cf::TreeNode<DecisionData>>(Scenario::S2);
+
+    m_dtree->yes->no->no->yes = std::make_shared<cf::TreeNode<DecisionData>>([](const DecisionData& data){
+        // is a vehicle to the left of the priority vehicle?
+        const auto& vehicles = data.first;
+        const auto& priority_vehicle = *std::find_if(vehicles.begin(), vehicles.end(), [&vehicles](const auto& v){
+            return tutils::get_vehicle(vehicles, v, Side::Right) == VinFlags::Invalid;
+        });
+
+        return tutils::get_vehicle(vehicles, priority_vehicle, Side::Left) != VinFlags::Invalid;
+    });
+
+    m_dtree->yes->no->no->yes->no = std::make_shared<cf::TreeNode<DecisionData>>(Scenario::S2);
+    m_dtree->yes->no->no->yes->yes = std::make_shared<cf::TreeNode<DecisionData>>(Scenario::S1);
 }
 
 Scenario ScenarioDetector::decision_tree(const DecisionData& data) const

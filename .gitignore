@@ -1,2 +1,3 @@
 build/
 .vscode/
+script/__pycache__/

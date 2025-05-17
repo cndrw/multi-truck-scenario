@@ -6,12 +6,14 @@
 struct Street
 {
     int width;
-    geometry_msgs::msg::Point direction; // direction of the street relative to event site
 };
 
 struct EventSite
 {
     geometry_msgs::msg::Point position;
     std::vector<Street> streets;
+    /* Width values of streets around the event site
+       always 4 values for left, right, top, bottom
+       const order: [left, right, top, bottom] */
     int width, height; // dimension of the event site
 };

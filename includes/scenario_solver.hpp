@@ -20,18 +20,7 @@ struct SolutionType
     int winner_vin;
 };
 
-enum class Side
-{
-    right,
-    left
-};
 
-enum VinFlags
-{
-    None = 0,
-    Invalid = -1,
-    Ignored = -2
-};
 
 class ScenarioSolver
 {
@@ -49,8 +38,6 @@ private:
     void solve_s1();
     void solve_s2();
     int solve_uncontrolled_intersection();
-    int get_vehicle(const mts_msgs::VehicleBaseData& vehicle, Side side);
-    bool is_opposite(float alpha, float beta) const;
     void pick_random_vehicle();
 
     std::vector<mts_msgs::VehicleBaseData> m_vehicles;
