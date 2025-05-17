@@ -227,12 +227,18 @@ class Map : public rclcpp::Node
       return cube;
     }
 
-    void draw_vehicle(const geometry_msgs::msg::Point& pos, const float heading, const int vin)
+    void draw_vehicle(const mts_msgs::VehicleBaseData::SharedPtr vehicle)
     {
         const auto time_stamp = this->now();
+        const auto& pos = vehicle->position.point;
+        const auto vin = vehicle->vin;
+        const auto heading = vehicle->direction;
+        const auto indicator = static_cast<Indicator>(vehicle->indicator_state);
+
         draw_vehicle_base(pos, vin, time_stamp);
-        draw_indicator(pos, heading, vin, time_stamp);
+        draw_indicator(pos, heading, indicator, vin, time_stamp);
         draw_heading_arrow(pos, heading, vin, time_stamp);
+
         m_vehicle_vis_pub->publish(m_vehicle_vis);
         m_vehicle_vis.markers.clear();
     }
@@ -259,7 +265,12 @@ class Map : public rclcpp::Node
       m_vehicle_vis.markers.push_back(cube);
     }
 
-    void draw_indicator(const geometry_msgs::msg::Point& pos, const float heading, const int vin, rclcpp::Time time_stamp)
+    void draw_indicator(
+        const geometry_msgs::msg::Point& pos,
+        const float heading,
+        const Indicator indicator,
+        const int vin,
+        rclcpp::Time time_stamp)
     {
         auto cube = visualization_msgs::msg::Marker();
         cube.header.stamp = time_stamp;
@@ -283,32 +294,54 @@ class Map : public rclcpp::Node
         auto indicator_point = geometry_msgs::msg::Point();
         indicator_point.x = std::cos((heading + 90) * tutils::DEG2RAD);
         indicator_point.y = std::sin((heading + 90) * tutils::DEG2RAD);
-        indicator_point = tutils::multiply(indicator_point, 0.5);
+        indicator_point = tutils::multiply(indicator_point, 0.35);
 
         cube.pose.position = tutils::add(front_point, indicator_point);
         cube.pose.position.z = 0.5;
 
-        cube.color.b = 1.0;
-        cube.color.g = 1.0;
-        cube.color.a = 1.0;
 
-        cube.scale.x = 0.5;
-        cube.scale.y = 0.5;
-        cube.scale.z = 0.5;
+        set_indicator_color(cube.color, indicator == Indicator::Left);
+
+        cube.scale.x = 0.2;
+        cube.scale.y = 0.2;
+        cube.scale.z = 0.2;
         cube.lifetime = rclcpp::Duration(2, 0);
-        // m_indicator_left_pub->publish(cube);
+        
         m_vehicle_vis.markers.push_back(cube);
 
         // right indiactor
         cube.id = vin + 100;
         indicator_point.x = std::cos((heading - 90) * tutils::DEG2RAD);
         indicator_point.y = std::sin((heading - 90) * tutils::DEG2RAD);
-        indicator_point = tutils::multiply(indicator_point, 0.5);
+        indicator_point = tutils::multiply(indicator_point, 0.35);
 
         cube.pose.position = tutils::add(front_point, indicator_point);
         cube.pose.position.z = 0.5;
-        // m_indicator_right_pub->publish(cube);
+
+        set_indicator_color(cube.color, indicator == Indicator::Right);
         m_vehicle_vis.markers.push_back(cube);
+    }
+
+    void set_indicator_color(std_msgs::msg::ColorRGBA& color_property, const bool is_on)
+    {
+        constexpr float color_on[] = { 0.958, 0.879, 0.311 };
+        constexpr float color_off[] = { 0.819, 0.361, 0.103 };
+        RCLCPP_INFO(get_logger(), "is on: %d", is_on);
+
+        if (!is_on)
+        {
+            color_property.r = color_off[0];
+            color_property.g = color_off[1];
+            color_property.b = color_off[2];
+            color_property.a = 1.0;
+            return;
+        }
+        // else is on
+
+        color_property.r = color_on[0];
+        color_property.g = color_on[1];
+        color_property.b = color_on[2];
+        color_property.a = 1.0;
     }
 
     void draw_heading_arrow(const geometry_msgs::msg::Point& pos, float heading, int id, rclcpp::Time time_stamp)
@@ -395,8 +428,7 @@ class Map : public rclcpp::Node
             m_vehicles[key] = vehicle_data;
         }
 
-        auto pos = vehicle_data->position.point;
-        draw_vehicle(vehicle_data->position.point, vehicle_data->direction, vehicle_data->vin);
+        draw_vehicle(vehicle_data);
     }
 
     bool is_out_of_bound(const geometry_msgs::msg::Point& pos)
