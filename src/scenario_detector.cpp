@@ -25,6 +25,7 @@ void ScenarioDetector::set_implemenation(const int detector, [[maybe_unused]] co
 {
     m_implementation = detector;
     m_decision_algo = decision_algo; 
+    RCLCPP_INFO(m_logger, "set: %d, %d", detector, decision_algo);
 }
 
 void ScenarioDetector::set_owner(const int owner_vin)
@@ -39,8 +40,10 @@ ScenarioDetector::ScenarioDetector() : m_logger(rclcpp::get_logger("detector"))
     impl[1] = std::bind(&ScenarioDetector::check_2, this, _1);
 
     m_decision_algo_impl[0] = std::bind(&ScenarioDetector::decision_tree, this, _1);
+    m_decision_algo_impl[1] = std::bind(&ScenarioDetector::knn_classify, this, _1);
 
     init_decision_tree();
+    init_knn();
 }
 
 std::pair<Scenario, std::vector<mts_msgs::VehicleBaseData>>
@@ -411,4 +414,23 @@ void ScenarioDetector::init_decision_tree()
 Scenario ScenarioDetector::decision_tree(const DecisionData& data) const
 {
     return cf::traverse<DecisionData>(m_dtree, data);
+}
+
+void ScenarioDetector::init_knn()
+{
+    // site.width | site.height | number streets | s1-4.width    | number vehicle
+    //     sw     |     sh      |      ns        | l | r | t | b |        ns 
+    m_knn_data_set = {
+        { cf::ScenarioSituation{ {/*sw*/ 2.0, /*sh*/ 2.0, /*ns*/ 4.0, /*s*/ /*l*/ 2.0, /*r*/ 2.0, /*t*/ 2.0, /*b*/ 2.0, /*nv*/ 4.0 }, Scenario::S2 } },
+        { cf::ScenarioSituation{ {/*sw*/ 2.0, /*sh*/ 2.0, /*ns*/ 4.0, /*s*/ /*l*/ 2.0, /*r*/ 2.0, /*t*/ 2.0, /*b*/ 2.0, /*nv*/ 3.0 }, Scenario::S2 } },
+        { cf::ScenarioSituation{ {/*sw*/ 2.0, /*sh*/ 2.0, /*ns*/ 4.0, /*s*/ /*l*/ 2.0, /*r*/ 2.0, /*t*/ 2.0, /*b*/ 2.0, /*nv*/ 2.0 }, Scenario::S2 } },
+        { cf::ScenarioSituation{ {/*sw*/ 2.0, /*sh*/ 2.0, /*ns*/ 3.0, /*s*/ /*l*/ 2.0, /*r*/ 2.0, /*t*/ 0.0, /*b*/ 1.0, /*nv*/ 2.0 }, Scenario::S1 } },
+        { cf::ScenarioSituation{ {/*sw*/ 2.0, /*sh*/ 2.0, /*ns*/ 4.0, /*s*/ /*l*/ 2.0, /*r*/ 2.0, /*t*/ 2.0, /*b*/ 2.0, /*nv*/ 3.0 }, Scenario::S1 } }
+    };
+
+}
+
+Scenario ScenarioDetector::knn_classify(const DecisionData& data) const
+{
+    return cf::knn_classify(m_knn_data_set, data, 3);
 }

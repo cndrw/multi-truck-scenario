@@ -35,7 +35,6 @@ public:
     {
         handle_parameters();
         m_scenario_solver.set_owner(m_vin);
-        m_scenario_detector.set_implemenation(1, 0);
         m_scenario_detector.set_owner(m_vin);
 
         // Publisher der die Daten der Instanz veröffentlicht
@@ -125,6 +124,11 @@ private:
         m_indicator_state = (Indicator)this->get_parameter("indicator_state").as_int();
         RCLCPP_INFO(get_logger(), "init indicator: %d", m_indicator_state);
         m_engine_state = (Engine)this->get_parameter("engine_state").as_int();
+
+        m_scenario_detector.set_implemenation(
+            this->get_parameter("scenario_detector").as_int(),
+            this->get_parameter("decision_algorithm").as_int() 
+        );
 
     }
 

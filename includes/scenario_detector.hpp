@@ -53,6 +53,8 @@ private:
     Scenario scenario_classification(const DecisionData&);
     Scenario decision_tree(const DecisionData&) const;
     void init_decision_tree();
+    Scenario knn_classify(const DecisionData&) const;
+    void init_knn();
 
 private:
     int m_owner_vin = -1;
@@ -63,5 +65,6 @@ private:
     std::array<std::function<Scenario(const std::vector<mts_msgs::VehicleBaseData>&)>, 2> impl;
     std::array<std::function<Scenario(const DecisionData&)>, 2> m_decision_algo_impl;
     std::shared_ptr<cf::TreeNode<DecisionData>> m_dtree;
+    std::vector<cf::ScenarioSituation> m_knn_data_set;
     rclcpp::Logger m_logger;
 };

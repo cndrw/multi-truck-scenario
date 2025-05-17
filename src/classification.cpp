@@ -1,27 +1,50 @@
 #include <functional>
 #include <memory>
 
+#include "multi_truck_scenario/msg/event_site_data.hpp"
+#include "multi_truck_scenario/msg/street_data.hpp"
+
 #include "multi_truck_scenario/msg/vehicle_base_data.hpp"
 #include "scenario_type.hpp"
 #include "classification.hpp"
 
 namespace cf {
 
-
-Scenario knn_classify(const std::vector<ScenarioSituation>& data_set, const ScenarioSituation& input, const int k)
+std::vector<float> extract_features(const DecisionData& situation)
 {
-    std::vector<std::pair<double, Scenario>> distances; 
-    for (const auto& p : data_set)
+    std::vector<float> features;
+    const auto& site = situation.second;
+    const auto& vehicles = situation.first;
+
+    features.push_back(site.width);
+    features.push_back(site.height);
+    features.push_back(site.num_streets);
+
+    for (const mts_msgs::StreetData& s : site.streets)
     {
-        const auto dist = distance_func(p, input);
-        distances.push_back({dist, p.scenario});
+        features.push_back(static_cast<float>(s.width));
+    }
+
+    features.push_back(vehicles.size());
+
+    return features;
+} 
+
+Scenario knn_classify(const std::vector<ScenarioSituation>& data_set, const DecisionData& input, const int k) 
+{
+    const auto query_features = extract_features(input);
+
+    std::vector<std::pair<float, Scenario>> distances;
+    for (const auto& data : data_set)
+    {
+        float dist = distance_func(query_features, data.features);
+        distances.push_back({dist, data.label});
     }
 
     std::sort(distances.begin(), distances.end());
 
-    // get most frequent class from k nearest neigbors
-    std::map<Scenario, int> class_count;
-    for (int i = 0; i < k; ++i)
+    std::unordered_map<Scenario, int> class_count;
+    for (int i = 0; i < k && i < (int)distances.size(); i++)
     {
         class_count[distances[i].second]++;
     }
@@ -29,28 +52,17 @@ Scenario knn_classify(const std::vector<ScenarioSituation>& data_set, const Scen
     const auto max_class = std::max_element(class_count.begin(), class_count.end(),
         [](const std::pair<Scenario, int>& a, const std::pair<Scenario, int>& b) {
             return a.second < b.second;
-        });
+    });
 
     return max_class->first;
 }
 
-double distance_func(const ScenarioSituation& a, const ScenarioSituation& b)
+double distance_func(const std::vector<float>& a, const std::vector<float>& b)
 {
-    std::vector<double> features = {
-        a.event_site.position.x,
-        a.event_site.position.y,
-        a.event_site.position.z,
-        (double)a.event_site.height,
-        (double)a.event_site.width,
-        // a.event_site.streets,
-        (double)a.vehicles.size()
-    };
-
-
     double sum = 0.0;
-    for (size_t i = 0; i < features.size(); ++i)
+    for (size_t i = 0; i < a.size(); ++i)
     {
-        // sum += std::pow(a[i] - b[i], 2);
+        sum += std::pow(a[i] - b[i], 2);
     }
     return std::sqrt(sum);
 }

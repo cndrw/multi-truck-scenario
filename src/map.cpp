@@ -326,7 +326,6 @@ class Map : public rclcpp::Node
     {
         constexpr float color_on[] = { 0.958, 0.879, 0.311 };
         constexpr float color_off[] = { 0.819, 0.361, 0.103 };
-        RCLCPP_INFO(get_logger(), "is on: %d", is_on);
 
         if (!is_on)
         {
@@ -462,6 +461,8 @@ class Map : public rclcpp::Node
 
         const auto& site = sites[0].second;
         response->event_site.position = site.position;
+        response->event_site.width = site.width;
+        response->event_site.height = site.height;
 
         int street_count = std::count_if(site.streets.begin(), site.streets.end(), [](const auto& s) {
             return s.width != 0;
