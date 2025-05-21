@@ -22,7 +22,8 @@ using namespace std::chrono_literals;
 namespace mts_msgs = multi_truck_scenario::msg;
 namespace mts_srvs = multi_truck_scenario::srv;
 
-enum Colors {
+enum GridColor
+{
     Red = -128,      // rot für -128 bis -70
     Yellow = -70,    // gelb für -70 bis -2
     Grey = 0,        // grau für -1 bis 80
@@ -151,19 +152,29 @@ class Map : public rclcpp::Node
         }
     }
 
-    std::vector<Colors> map_color_parameter()
+    std::vector<GridColor> map_color_parameter()
     {
         // Declare the parameter and fetch it
         this->declare_parameter<std::vector<int64_t>>("static_map", {}); // Declare as int64_t
         std::vector<int64_t> static_map_raw = this->get_parameter("static_map").as_integer_array();
 
         // Convert to Colors
-        std::vector<Colors> static_map_colors;
+        std::vector<GridColor> static_map_colors;
         for (const auto &value : static_map_raw)
         {
+
             if (value >= -128 && value <= 127)
             {
-                static_map_colors.push_back(static_cast<Colors>(value));
+                RCLCPP_INFO(get_logger(), "c: %d", value);
+                if (value != GridColor::Grey)
+                {
+                    static_map_colors.push_back(GridColor::Black);
+                }
+                else
+                {
+                    static_map_colors.push_back(GridColor::Grey);
+                }
+                // static_map_colors.push_back(static_cast<GridColor>(value));
 
             } else {
                 RCLCPP_WARN(this->get_logger(), "Value %ld is out of range for Colors enum. Skipping.", value);
@@ -191,7 +202,7 @@ class Map : public rclcpp::Node
           y++;
         }
 
-        if (m_static_map[i] == Colors::Black)
+        if (m_static_map[i] == GridColor::Black)
         {
           blocks.push_back(draw_border_block(x, y, 0.25, i));
         }
@@ -326,7 +337,6 @@ class Map : public rclcpp::Node
     {
         constexpr float color_on[] = { 0.958, 0.879, 0.311 };
         constexpr float color_off[] = { 0.819, 0.361, 0.103 };
-        RCLCPP_INFO(get_logger(), "is on: %d", is_on);
 
         if (!is_on)
         {
@@ -418,7 +428,7 @@ class Map : public rclcpp::Node
         if (m_vehicles.count(key) == 0) 
         {
             m_vehicles.emplace(key, vehicle_data);
-            m_color_map.emplace(key, Colors::Red);
+            m_color_map.emplace(key, GridColor::Red);
             auto c = std_msgs::msg::ColorRGBA();
             c.r = 1;
             m_car_visuals.emplace(key, c);
@@ -441,7 +451,7 @@ class Map : public rclcpp::Node
         const auto vin = solution->winner_vin;
 
         // set the winner green
-        m_color_map[vin] = Colors::Green;
+        m_color_map[vin] = GridColor::Green;
         auto c = m_car_visuals[vin];
         c.g = 1;
         c.r = 0;
@@ -501,11 +511,11 @@ class Map : public rclcpp::Node
         return outside + inside;
     }
 
-    void add_to_map(const std::vector<Colors>& grid)
+    void add_to_map(const std::vector<GridColor>& grid)
     {
         for (size_t i = 0; i < m_grid.size(); i++)
         {
-            if (grid[i] == Colors::Grey) continue; // Grey means empty
+            if (grid[i] == GridColor::Grey) continue; // Grey means empty
             m_grid[i] = static_cast<int8_t>(grid[i]); // Map Colors enum to int8_t
         }
     }
@@ -524,7 +534,7 @@ class Map : public rclcpp::Node
     std::chrono::milliseconds send_frequenzy = 500ms;
     rclcpp::TimerBase::SharedPtr m_timer;
     std::unordered_map<int, mts_msgs::VehicleBaseData::SharedPtr> m_vehicles;
-    std::vector<Colors> m_static_map;
+    std::vector<GridColor> m_static_map;
     std::vector<int8_t> m_grid;
     std::unordered_map<int, int> m_color_map;
     std::unordered_map<int, std_msgs::msg::ColorRGBA> m_car_visuals;
