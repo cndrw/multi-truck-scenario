@@ -103,6 +103,16 @@ ScenarioDetector::apply_fuzzy_logic(const std::vector<mts_msgs::VehicleBaseData>
         FValue distance = distance_fuzzy_func(get_event_site_distance(vehicle.position, id));
         // apply fuzzy rules to involveed_vehicles (according to their involvement B)
         FValue involvement = apply_fuzzy_rules(velocity, distance);
+
+        // RCLCPP_INFO(m_logger, "(%d von %d) vel 1: %f  2: %f  3: %f", vehicle.vin, m_owner_vin, velocity.first, velocity.second, velocity.third);
+        // RCLCPP_INFO(m_logger, "(%d von %d) dist 1: %f  2: %f  3: %f", vehicle.vin, m_owner_vin, distance.first, distance.second, distance.third);
+        // RCLCPP_INFO(m_logger, "(%d von %d) involvement 1: %f  2: %f  3: %f", vehicle.vin, m_owner_vin, involvement.first, involvement.second, involvement.third);
+
+        if (involvement.second > involvement.first)
+        {
+            continue;
+        }
+
         fuzzy_vehicles.push_back({vehicle, involvement});
     }
     return fuzzy_vehicles;
@@ -122,6 +132,7 @@ Scenario ScenarioDetector::check_2(const std::vector<mts_msgs::VehicleBaseData>&
     const auto& site_id = event_site.first;
     const auto& site_data = event_site.second;
 
+    // filter out vehicles that are facing/driving away from the event site
     for (const auto& vehicle : vehicles)
     {
         // d(r) <= d(r + a)
@@ -142,13 +153,18 @@ Scenario ScenarioDetector::check_2(const std::vector<mts_msgs::VehicleBaseData>&
         }
     }
 
-    if (invoveld_vehicles.empty() || invoveld_vehicles.size() == 1)
+    auto sorted_vehicles = get_sorted_vehicles(invoveld_vehicles, site_id);
+
+    // check if owner vehicle is still relevant for scenario
+    auto owner_v = std::find_if(vehicles.begin(), vehicles.end(), [this](const auto& v) {
+        return v.vin == this->m_owner_vin;
+    });
+
+    if (sorted_vehicles.empty() || sorted_vehicles.size() == 1 || owner_v->vin != m_owner_vin)
     {
-        RCLCPP_INFO(m_logger, "Invalid amount of involved Vehicles in viewed Scenario (%d)", invoveld_vehicles.size());
+        RCLCPP_INFO(m_logger, "(%d) Invalid amount of involved Vehicles in viewed Scenario (%d)", m_owner_vin, sorted_vehicles.size());
         return Scenario::None;
     }
-
-    auto sorted_vehicles = get_sorted_vehicles(invoveld_vehicles, site_id);
 
     Scenario scenario_result = Scenario::None; 
     for (size_t i = 2; i <= sorted_vehicles.size(); i++)

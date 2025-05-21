@@ -163,6 +163,7 @@ private:
         {
             if (!m_driving_permission) RCLCPP_INFO(get_logger(), "No scenario found - grant driving permission");
             set_driving_permission(true);
+            m_nearby_vehicles.clear();
             return;
         }
 
