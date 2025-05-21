@@ -55,9 +55,31 @@ Scenario traverse(const std::shared_ptr<TreeNode<T>>& node, const T& data)
     }
 }
 
-
 Scenario knn_classify(const std::vector<ScenarioSituation>& data_set, const DecisionData& input, const int k);
-
 double distance_func(const std::vector<float>& a, const std::vector<float>& b);
+
+template <typename T>
+struct BayesianNode
+{
+    std::function<bool (Scenario, const T&)> get_probability;
+    std::vector<std::shared_ptr<BayesianNode<T>>> parent;
+};
+
+template <typename T>
+Scenario traverse(const std::shared_ptr<BayesianNode<T>>& node, const T& data)
+{
+    // anpassen wenn ich die anzahl an scenarien ändert die betrachtet werden
+    std::array<double, 2> probabilities;
+    for (const auto& parent : node->parent)
+    {
+        probabilities[0] *= parent->get_probability(Scenario::S1, data);
+        probabilities[1] *= parent->get_probability(Scenario::S1, data);
+    }
+
+    auto maxIt = std::max_element(probabilities.begin(), probabilities.end());
+    int index = std::distance(probabilities.begin(), maxIt);
+
+    return static_cast<Scenario>(index + 1);
+}
 
 }
