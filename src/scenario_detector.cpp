@@ -44,6 +44,7 @@ ScenarioDetector::ScenarioDetector() : m_logger(rclcpp::get_logger("detector"))
 
     init_decision_tree();
     init_knn();
+    init_bayesian_network();
 }
 
 std::pair<Scenario, std::vector<mts_msgs::VehicleBaseData>>
@@ -59,6 +60,42 @@ ScenarioDetector::check(const std::vector<mts_msgs::VehicleBaseData>& vehicles)
 Scenario ScenarioDetector::check_1([[maybe_unused]] const std::vector<mts_msgs::VehicleBaseData>& vehicles)
 {
     return Scenario();
+}
+
+void ScenarioDetector::init_bayesian_network()
+{
+    m_bayesian_network.add_cpd({
+        "Wetter", {"Sonne", "Regen"}, {}, {}, {
+            {0.4}, {0.6}
+        }
+    });
+
+    m_bayesian_network.add_cpd({
+        "Mensaessen", {"Genießbar", "Ungenießbar"},
+        {}, {}, {
+            {0.9, 0.1},
+        }
+    });
+
+    m_bayesian_network.add_cpd({
+        "Stimmung", {"Gut", "Schlecht"},
+        {"Wetter", "Mensaessen"}, {2, 2}, {
+            {0.95, 0.7, 0.75, 0.1},  // Yes
+            {0.05, 0.3, 0.25, 0.9}   // No
+        }
+    });
+
+    // Beispielabfrage:
+    std::map<std::string, std::string> evidence =
+    {
+        {"Wetter", "Sonne"},
+        {"Mensaessen", "Genießbar"}
+    };
+
+    double p_yes = m_bayesian_network.query("Stimmung", "Gut", evidence);
+    double p_no = m_bayesian_network.query("Stimmung", "Schlecht", evidence);
+
+    RCLCPP_INFO(m_logger, "Go to work Yes: %f,  No: %f", p_yes, p_no);
 }
 
 std::pair<int, mts_msgs::EventSiteData> ScenarioDetector::get_event_site(const mts_msgs::VehicleBaseData &vehicle)

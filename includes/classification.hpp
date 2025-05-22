@@ -58,28 +58,26 @@ Scenario traverse(const std::shared_ptr<TreeNode<T>>& node, const T& data)
 Scenario knn_classify(const std::vector<ScenarioSituation>& data_set, const DecisionData& input, const int k);
 double distance_func(const std::vector<float>& a, const std::vector<float>& b);
 
-template <typename T>
-struct BayesianNode
+struct CPD
 {
-    std::function<bool (Scenario, const T&)> get_probability;
-    std::vector<std::shared_ptr<BayesianNode<T>>> parent;
+    std::string variable;
+    std::vector<std::string> states;
+    std::vector<std::string> parents;
+    std::vector<int> parent_cardinalities;
+    std::vector<std::vector<double>> probabilities;
 };
 
-template <typename T>
-Scenario traverse(const std::shared_ptr<BayesianNode<T>>& node, const T& data)
+class BayesianNetwork
 {
-    // anpassen wenn ich die anzahl an scenarien ändert die betrachtet werden
-    std::array<double, 2> probabilities;
-    for (const auto& parent : node->parent)
-    {
-        probabilities[0] *= parent->get_probability(Scenario::S1, data);
-        probabilities[1] *= parent->get_probability(Scenario::S1, data);
-    }
+public:
+    void add_cpd(const CPD& cpd);
+    int state_index(const std::vector<std::string>& states, const std::string& value);
+    // Berechne P(variable=value | evidenz)
+    double query(std::string query_var, std::string query_val, std::map<std::string, std::string> evidence);
+    double full_joint_prob(std::map<std::string, std::string> evidence);
 
-    auto maxIt = std::max_element(probabilities.begin(), probabilities.end());
-    int index = std::distance(probabilities.begin(), maxIt);
-
-    return static_cast<Scenario>(index + 1);
-}
+private:
+    std::map<std::string, CPD> m_cpds;
+};
 
 }
