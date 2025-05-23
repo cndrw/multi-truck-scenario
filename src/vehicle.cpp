@@ -312,10 +312,8 @@ private:
         double roll, pitch, yaw;
         m.getRPY(roll, pitch, yaw);
 
+        m_direction = yaw * tutils::RAD2DEG;
         RCLCPP_INFO(get_logger(), "roll: %f, pitch: %f, yaw: %f", roll * tutils::RAD2DEG, pitch * tutils::RAD2DEG, yaw * tutils::RAD2DEG);
-
-        // theoretisch m_direction = odometry->pose.pose.orientation
-        // aber orientation ist in quaternionen und m_direction in grad
     }
 
     bool vehicle_standard_filter(const mts_msgs::VehicleBaseData::SharedPtr vehicle_data)
