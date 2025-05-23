@@ -33,7 +33,7 @@ class Vehicle : public rclcpp::Node
 {
 public:
     Vehicle()
-        : rclcpp::Node("vehicle"), m_startup_time(std::chrono::milliseconds(700))
+        : rclcpp::Node("vehicle"), m_startup_time(std::chrono::milliseconds(1500))
     {
         handle_parameters();
         m_scenario_solver.set_owner(m_vin);
