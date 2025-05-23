@@ -5,8 +5,10 @@
 #include <cmath> // für std::sqrt
 #include <random>
 
-#include "std_msgs/msg/header.hpp"
 #include "rclcpp/rclcpp.hpp"
+#include "tf2/LinearMath/Quaternion.h"
+#include "tf2_geometry_msgs/tf2_geometry_msgs.h"
+#include "std_msgs/msg/header.hpp"
 #include "nav_msgs/msg/occupancy_grid.hpp"
 #include "geometry_msgs/msg/point_stamped.hpp"
 #include "geometry_msgs/msg/pose_with_covariance_stamped.hpp"
@@ -221,6 +223,11 @@ private:
             return;
         }
 
+        send_truck_control_limit(value);
+    }
+
+    void send_truck_control_limit(const bool value)
+    {
         const auto client = create_client<truck_msgs::srv::ZfSetControlLimits>("set_control_limits");
 
         auto request = std::make_shared<truck_msgs::srv::ZfSetControlLimits::Request>();
@@ -247,7 +254,7 @@ private:
         }
         else
         {
-            RCLCPP_ERROR(this->get_logger(), "Failed to call service add_two_ints");
+            RCLCPP_ERROR(this->get_logger(), "Failed to call service [ZF-Truck]set_control_limits");
         }
     }
 
@@ -297,6 +304,16 @@ private:
     void truck_odometry_callback(const geometry_msgs::msg::PoseWithCovarianceStamped::SharedPtr odometry)
     {
         m_position.point = odometry->pose.pose.position;
+
+        tf2::Quaternion quat_tf;
+        tf2::fromMsg(odometry->pose.pose.orientation, quat_tf); 
+
+        tf2::Matrix3x3 m(quat_tf);
+        double roll, pitch, yaw;
+        m.getRPY(roll, pitch, yaw);
+
+        RCLCPP_INFO(get_logger(), "roll: %f, pitch: %f, yaw: %f", roll * tutils::RAD2DEG, pitch * tutils::RAD2DEG, yaw * tutils::RAD2DEG);
+
         // theoretisch m_direction = odometry->pose.pose.orientation
         // aber orientation ist in quaternionen und m_direction in grad
     }
