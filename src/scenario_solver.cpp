@@ -63,8 +63,21 @@ void ScenarioSolver::solve_s1()
 
     int upgraded_priority_car = tutils::get_vehicle(m_vehicles, vehicle, Side::Left);
 
-    m_solution.author_vin = m_owner_vin;
-    m_solution.winner_vin = upgraded_priority_car;
+    // check if there is a vehicle opposed to the one that would give away its right of way
+    // if so grant IT the right of way
+    const auto vehicle2 = *std::find_if(m_vehicles.begin(), m_vehicles.end(), [upgraded_priority_car](const auto& v){
+        return v.vin == upgraded_priority_car;
+    });
+
+    const auto v_vin = tutils::get_vehicle(m_vehicles, vehicle2, Side::Left);
+    if (v_vin != VinFlags::Invalid)
+    {
+        m_solution.winner_vin = v_vin;
+    }
+    else
+    {
+        m_solution.winner_vin = upgraded_priority_car;
+    }
 }
 
 void ScenarioSolver::solve_s2()
