@@ -62,7 +62,7 @@ private:
     int m_implementation = -1;
     int m_decision_algo = 0;
     int m_cur_event_site_id = -1;
-    cf::BayesianNetwork m_bayesian_network;
+    std::array<float, 20> m_bayesian_net;
     std::vector<mts_msgs::VehicleBaseData> m_vehicles;
     std::array<std::function<Scenario(const std::vector<mts_msgs::VehicleBaseData>&)>, 2> impl;
     std::array<std::function<Scenario(const DecisionData&)>, 2> m_decision_algo_impl;

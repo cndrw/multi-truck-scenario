@@ -58,26 +58,4 @@ Scenario traverse(const std::shared_ptr<TreeNode<T>>& node, const T& data)
 Scenario knn_classify(const std::vector<ScenarioSituation>& data_set, const DecisionData& input, const int k);
 double distance_func(const std::vector<float>& a, const std::vector<float>& b);
 
-struct CPD
-{
-    std::string variable;
-    std::vector<std::string> states;
-    std::vector<std::string> parents;
-    std::vector<int> parent_cardinalities;
-    std::vector<std::vector<double>> probabilities;
-};
-
-class BayesianNetwork
-{
-public:
-    void add_cpd(const CPD& cpd);
-    int state_index(const std::vector<std::string>& states, const std::string& value);
-    // Berechne P(variable=value | evidenz)
-    double query(std::string query_var, std::string query_val, std::map<std::string, std::string> evidence);
-    double full_joint_prob(std::map<std::string, std::string> evidence);
-
-private:
-    std::map<std::string, CPD> m_cpds;
-};
-
 }
