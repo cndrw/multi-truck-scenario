@@ -59,14 +59,101 @@ ScenarioDetector::check(const std::vector<mts_msgs::VehicleBaseData>& vehicles)
 
 Scenario ScenarioDetector::check_1([[maybe_unused]] const std::vector<mts_msgs::VehicleBaseData>& vehicles)
 {
-    return Scenario();
+    // get nearest event site to owner vin
+    auto owner_vehicle = *std::find_if(vehicles.begin(), vehicles.end(), [this](const auto& v) {
+        return v.vin == this->m_owner_vin;
+    });
+
+    const auto event_site = get_event_site(owner_vehicle);
+    const auto& site_id = event_site.first;
+    const auto& site_data = event_site.second;
+
+    std::vector<Scenario> possible_scenario;
+
+    for (const auto& vehicle : vehicles)
+    {
+        // distance
+        const auto dist = get_event_site_distance(vehicle.position, site_id);
+        const FValue fdist = distance_fuzzy_func(dist);
+
+        // street width
+        const bool has_small_street = std::any_of(site_data.streets.begin(), site_data.streets.end(), [](const mts_msgs::StreetData s){
+            return s.width < 2;
+        });
+
+        possible_scenario.push_back(evalute_bayesian(vehicles.size(), has_small_street, fdist));
+    }
+
+    // determine which scneario is most often in the vector
+    std::unordered_map<Scenario, int> freq;
+    for (Scenario num : possible_scenario)
+    {
+        freq[num]++;
+    }
+
+    const auto scenario_result = std::max_element(freq.begin(), freq.end(), [](const auto& a, const auto& b) {
+        return a.second < b.second;
+    })->first;
+
+    RCLCPP_INFO(m_logger, "Vehicle %d detected scenario: %d", m_owner_vin, scenario_result);
+
+    return scenario_result;
+}
+
+Scenario ScenarioDetector::evalute_bayesian(const int num_vehicle, const bool has_small_street, const FValue distance)
+{
+    int num_vehicle_i = 0; // [0 1 2]
+    switch (num_vehicle)
+    {
+        case 2: num_vehicle_i = 1; break;
+        case 3: num_vehicle_i = 1; break;
+        case 4: num_vehicle_i = 2; break;
+    }
+
+    int streets_i = static_cast<int>(!has_small_street);
+    
+    int distance_i = 1; // [0 1 2]
+    const auto max_val = std::max({distance.first, distance.second, distance.third});
+    if (distance.first == max_val) distance_i = 0;
+    else if (distance.second == max_val) distance_i = 1;
+    else if (distance.third == max_val) distance_i = 2;
+
+    int index = num_vehicle_i * 18 + streets_i * 9 + distance_i * 3;
+
+    auto prob_s1 = m_bayesian_net[index];
+    auto prob_s2 = m_bayesian_net[index + 1];
+    auto prob_none = m_bayesian_net[index + 2];
+
+    const auto max_prob = std::max({ prob_s1, prob_s2, prob_none });
+    Scenario res = Scenario::None;
+    if (max_prob == prob_s1) res = Scenario::S1;
+    if (max_prob == prob_s2) res = Scenario::S2;
+    if (max_prob == prob_none) res = Scenario::None;
+    return res;
 }
 
 void ScenarioDetector::init_bayesian_network()
 {
     m_bayesian_net = {
-    //  None | S1 | S2
-        2, 3, 4
+    // Anzahl Fzg. | Straße | Position |   S1   |   S2   | Nichts
+    /* <=1         | schmal | nahe */   0.2364 , 0.1182 , 0.6454,
+    /* <=1,        | schmal | drin */   0.1195 , 0.1195 , 0.761,
+    /* <=1,        | schmal | fern */   0.103  , 0.0772 , 0.8198,
+    /* <=1,        | breit  | nahe */   0.0245 , 0.1718 , 0.8037,
+    /* <=1,        | breit  | drin */   0.0109 , 0.1531 , 0.8359,
+    /* <=1,        | breit  | fern */   0.0093 , 0.0981 , 0.8926,
+    /*(1-3],       | schmal | nahe */   0.7667 , 0.2236 , 0.0097,
+    /*(1-3],       | schmal | drin */   0.62   , 0.3617 , 0.0183,
+    /*(1-3],       | schmal | fern */   0.6783 , 0.2967 , 0.025,
+    /*(1-3],       | breit  | nahe */   0.191  , 0.78   , 0.029,
+    /*(1-3],       | breit  | drin */   0.0962 , 0.7511 , 0.1527,
+    /*(1-3],       | breit  | fern */   0.0864 , 0.5643 , 0.3493,
+    /* >=4,        | schmal | nahe */   0.5    , 0.5    , 0,
+    /* >=4,        | schmal | drin */   0.3333 , 0.6667 , 0,
+    /* >=4,        | schmal | fern */   0.4    , 0.6    , 0,
+    /* >=4,        | breit  | nahe */   0.0667 , 0.9333 , 0,
+    /* >=4,        | breit  | drin */   0.0333 , 0.9667 , 0,
+    /* >=4,        | breit  | fern */   0.03   , 0.97   , 0
     };
 }
 

@@ -99,7 +99,7 @@ def generate_launch_description():
                     'position_z': vehicle['position_z'],
                     'direction': vehicle['direction_angle'],
                     'is_simulated': True,
-                    'scenario_detector': 0, # Hardcode
+                    'scenario_detector': 1, # Hardcode
                     'decision_algorithm': 0,
                 }],
                 arguments=['--ros-args', '--log-level', 'INFO']
