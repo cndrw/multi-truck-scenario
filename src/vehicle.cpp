@@ -6,10 +6,10 @@
 #include <random>
 
 #include "rclcpp/rclcpp.hpp"
-#include "tf2/LinearMath/Quaternion.h"
-#include "tf2_geometry_msgs/tf2_geometry_msgs.h"
+// #include "tf2/LinearMath/Quaternion.h"
+// #include "tf2_geometry_msgs/tf2_geometry_msgs.h"
 #include "std_msgs/msg/header.hpp"
-#include "nav_msgs/msg/occupancy_grid.hpp"
+// #include "nav_msgs/msg/occupancy_grid.hpp"
 #include "geometry_msgs/msg/point_stamped.hpp"
 #include "geometry_msgs/msg/pose_with_covariance_stamped.hpp"
 
@@ -124,7 +124,7 @@ private:
         m_vin = this->get_parameter("vin").as_int();
         m_speed = this->get_parameter("speed").as_double();
         m_indicator_state = (Indicator)this->get_parameter("indicator_state").as_int();
-        RCLCPP_INFO(get_logger(), "init indicator: %d", m_indicator_state);
+        RCLCPP_INFO(get_logger(), "init indicator: %d", (int)m_indicator_state);
         m_engine_state = (Engine)this->get_parameter("engine_state").as_int();
 
         m_scenario_detector.set_implemenation(
@@ -228,7 +228,7 @@ private:
             return;
         }
 
-        send_truck_control_limit(value);
+        // send_truck_control_limit(value);
     }
 
     void send_truck_control_limit(const bool value)
@@ -306,8 +306,9 @@ private:
         }
     }
 
-    void truck_odometry_callback(const geometry_msgs::msg::PoseWithCovarianceStamped::SharedPtr odometry)
+    void truck_odometry_callback([[maybe_unused]] const geometry_msgs::msg::PoseWithCovarianceStamped::SharedPtr odometry)
     {
+    /*
         m_position.point = odometry->pose.pose.position;
 
         tf2::Quaternion quat_tf;
@@ -319,6 +320,7 @@ private:
 
         m_direction = yaw * tutils::RAD2DEG;
         RCLCPP_INFO(get_logger(), "roll: %f, pitch: %f, yaw: %f", roll * tutils::RAD2DEG, pitch * tutils::RAD2DEG, yaw * tutils::RAD2DEG);
+        */
     }
 
     bool vehicle_standard_filter(const mts_msgs::VehicleBaseData::SharedPtr vehicle_data)
@@ -367,7 +369,7 @@ private:
             {
                 solve_scenario();
             }
-            else RCLCPP_INFO(get_logger(), "Not all scenario proposals are equal", m_vin);
+            else RCLCPP_INFO(get_logger(), "Not all scenario proposals are equal");
 
             m_detected_scenario = Scenario::None;
             m_proposal_buffer.clear();
