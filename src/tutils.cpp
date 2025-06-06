@@ -65,6 +65,15 @@ geometry_msgs::msg::Point multiply(const geometry_msgs::msg::Point &p1, const do
     return p;
 }
 
+geometry_msgs::msg::Point create_point(const double x, const double y, const double z)
+{
+    auto p = geometry_msgs::msg::Point();
+    p.x = x;
+    p.y = y;
+    p.z = z;
+    return p;
+}
+
 double norm_angle(double angle)
 {
     double result = std::fmod(angle, 360.0);

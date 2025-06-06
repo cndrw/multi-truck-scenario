@@ -56,6 +56,12 @@ namespace tutils {
         const double factor
     );
 
+    geometry_msgs::msg::Point create_point(
+        const double x,
+        const double y,
+        const double z
+    );
+
     // return the given angle as angle between 0-360
     double norm_angle(double angle);
 
