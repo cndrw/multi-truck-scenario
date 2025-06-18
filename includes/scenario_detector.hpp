@@ -32,8 +32,10 @@ public:
 private:
     using DecisionData = std::pair<std::vector<mts_msgs::VehicleBaseData>, mts_msgs::EventSiteData>;
 
-    Scenario check_2(const std::vector<mts_msgs::VehicleBaseData>& vehicle); // impl 2 from T3100 
     Scenario check_1(const std::vector<mts_msgs::VehicleBaseData>& vehicle); // impl 2 from T3100
+    Scenario evalute_bayesian(int num_vehicle, bool has_small_street, FValue distance);
+    void init_bayesian_network();
+    Scenario check_2(const std::vector<mts_msgs::VehicleBaseData>& vehicle); // impl 2 from T3100 
     std::pair<int, mts_msgs::EventSiteData> get_event_site(const mts_msgs::VehicleBaseData& vehicle);
     std::vector<std::tuple<mts_msgs::VehicleBaseData, FValue>> apply_fuzzy_logic(const std::vector<mts_msgs::VehicleBaseData>&, int);
     FValue velocity_fuzzy_func(float velocity);
@@ -53,15 +55,19 @@ private:
     Scenario scenario_classification(const DecisionData&);
     Scenario decision_tree(const DecisionData&) const;
     void init_decision_tree();
+    Scenario knn_classify(const DecisionData&) const;
+    void init_knn();
 
 private:
     int m_owner_vin = -1;
     int m_implementation = -1;
     int m_decision_algo = 0;
     int m_cur_event_site_id = -1;
+    std::array<float, 54> m_bayesian_net;
     std::vector<mts_msgs::VehicleBaseData> m_vehicles;
     std::array<std::function<Scenario(const std::vector<mts_msgs::VehicleBaseData>&)>, 2> impl;
     std::array<std::function<Scenario(const DecisionData&)>, 2> m_decision_algo_impl;
     std::shared_ptr<cf::TreeNode<DecisionData>> m_dtree;
+    std::vector<cf::ScenarioSituation> m_knn_data_set;
     rclcpp::Logger m_logger;
 };

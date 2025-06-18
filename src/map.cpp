@@ -472,6 +472,8 @@ class Map : public rclcpp::Node
 
         const auto& site = sites[0].second;
         response->event_site.position = site.position;
+        response->event_site.width = site.width;
+        response->event_site.height = site.height;
 
         int street_count = std::count_if(site.streets.begin(), site.streets.end(), [](const auto& s) {
             return s.width != 0;
