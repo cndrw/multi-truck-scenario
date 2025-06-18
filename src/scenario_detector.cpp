@@ -25,7 +25,9 @@ void ScenarioDetector::set_implemenation(const int detector, [[maybe_unused]] co
 {
     m_implementation = detector;
     m_decision_algo = decision_algo; 
-    RCLCPP_INFO(m_logger, "set: %d, %d", detector, decision_algo);
+    const auto major = std::to_string(detector + 1);
+    const auto minor = std::to_string(decision_algo + 1);
+    RCLCPP_INFO(m_logger, "Active Scenario Detector V%s.%s", major.c_str(), minor.c_str());
 }
 
 void ScenarioDetector::set_owner(const int owner_vin)
@@ -249,6 +251,7 @@ Scenario ScenarioDetector::check_2(const std::vector<mts_msgs::VehicleBaseData>&
         }
     }
 
+    // get vehicles sorted by "zugehörigkeit"
     auto sorted_vehicles = get_sorted_vehicles(invoveld_vehicles, site_id);
 
     // check if owner vehicle is still relevant for scenario
@@ -279,7 +282,7 @@ Scenario ScenarioDetector::check_2(const std::vector<mts_msgs::VehicleBaseData>&
     }
 
     m_vehicles = sorted_vehicles; // involved vehicles (final)
-    RCLCPP_INFO(m_logger, "Vehicle %d detected scenario: %d", m_owner_vin, scenario_result);
+    RCLCPP_INFO(m_logger, "Vehicle %d detected scenario: %d (amount vehicle: %d)", m_owner_vin, scenario_result, m_vehicles.size());
 
     return scenario_result;
 }

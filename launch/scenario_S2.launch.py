@@ -69,7 +69,7 @@ def generate_launch_description():
 
     vehicles = [
         {'name': 'vehicle_1', 'vin': 1, 'engine': 0, 'speed': 0.0, 'indicator': 0, 'position_x': 2.0, 'position_y': 0.0, 'position_z': 0.0, 'direction_angle': 90.0},
-        {'name': 'vehicle_2', 'vin': 2, 'engine': 0, 'speed': 0.0, 'indicator': 0, 'position_x': 3.0, 'position_y': 2.0, 'position_z': 0.0, 'direction_angle': 180.0}, 
+        # {'name': 'vehicle_2', 'vin': 2, 'engine': 0, 'speed': 0.0, 'indicator': 0, 'position_x': 3.0, 'position_y': 2.0, 'position_z': 0.0, 'direction_angle': 180.0}, 
         {'name': 'vehicle_3', 'vin': 3, 'engine': 0, 'speed': 0.0, 'indicator': 0, 'position_x': 0.0, 'position_y': 1.0, 'position_z': 0.0, 'direction_angle': 0.0},
         {'name': 'vehicle_4', 'vin': 4, 'engine': 0, 'speed': 0.0, 'indicator': 0, 'position_x': 1.0, 'position_y': 3.0, 'position_z': 0.0, 'direction_angle': 270.0}
         # Add more vehicles as needed
@@ -99,8 +99,8 @@ def generate_launch_description():
                     'position_z': vehicle['position_z'],
                     'direction': vehicle['direction_angle'],
                     'is_simulated': True,
-                    'scenario_detector': 1, # 0 = V0 ; 1 = V1.x
-                    'decision_algorithm': 1, # 0 = V1.1 ; 1 = V1.2
+                    'scenario_detector': 1, # 0 = V1 ; 1 = V2.x
+                    'decision_algorithm': 1, # 0 = V2.1 ; 1 = V2.2
                 }],
                 arguments=['--ros-args', '--log-level', 'INFO']
             )
