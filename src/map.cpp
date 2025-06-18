@@ -58,12 +58,12 @@ class Map : public rclcpp::Node
         );
 
         
-        m_solution_sub = this->create_subscription<mts_msgs::Solution>("solution", 10,
+        m_solution_sub = this->create_subscription<mts_msgs::Solution>("/ext/solution", 10,
             std::bind(&Map::solution_callback, this, std::placeholders::_1)
         );
 
         using namespace std::placeholders;
-        m_vehicle_sub = this->create_subscription<mts_msgs::VehicleBaseData>("vehicle_base_data", 10,
+        m_vehicle_sub = this->create_subscription<mts_msgs::VehicleBaseData>("/ext/vehicle_base_data", 10,
             std::bind(&Map::vehicle_position_callback, this, _1)
         );
 

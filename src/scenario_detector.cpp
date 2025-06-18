@@ -163,7 +163,7 @@ std::pair<int, mts_msgs::EventSiteData> ScenarioDetector::get_event_site(const m
 {
     std::shared_ptr<rclcpp::Node> node = rclcpp::Node::make_shared("map_requester");
     rclcpp::Client<mts_srvs::GetEventSiteID>::SharedPtr client =
-        node->create_client<mts_srvs::GetEventSiteID>("get_event_site_id");
+        node->create_client<mts_srvs::GetEventSiteID>("/ext/get_event_site_id");
 
     auto request = std::make_shared<mts_srvs::GetEventSiteID::Request>();
     request->position = vehicle.position;
@@ -407,7 +407,7 @@ float ScenarioDetector::get_event_site_distance(const geometry_msgs::msg::PointS
 {
     std::shared_ptr<rclcpp::Node> node = rclcpp::Node::make_shared("map_requester");
     rclcpp::Client<mts_srvs::GetEventSiteDistance>::SharedPtr client =
-        node->create_client<mts_srvs::GetEventSiteDistance>("get_event_site_distance");
+        node->create_client<mts_srvs::GetEventSiteDistance>("/ext/get_event_site_distance");
 
     auto request = std::make_shared<mts_srvs::GetEventSiteDistance::Request>();
     request->position = position;

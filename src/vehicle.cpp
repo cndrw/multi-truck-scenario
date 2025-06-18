@@ -46,11 +46,11 @@ public:
 
         // Subscriber der die Werte der anderen Fahrzeuge empfängt
         m_vehicle_sub = this->create_subscription<mts_msgs::VehicleBaseData>(
-            "vehicle_base_data", 10, std::bind(&Vehicle::vehicle_position_callback, this, std::placeholders::_1)
+            "/ext/vehicle_base_data", 10, std::bind(&Vehicle::vehicle_position_callback, this, std::placeholders::_1)
         );
 
          m_solution_sub = this->create_subscription<mts_msgs::Solution>(
-            "solution", 10, std::bind(&Vehicle::solution_callback, this, std::placeholders::_1)
+            "/ext/solution", 10, std::bind(&Vehicle::solution_callback, this, std::placeholders::_1)
         );
 
         m_vehicle_move_update = this->create_wall_timer(
@@ -64,7 +64,7 @@ public:
         m_dproposal_pub = this->create_publisher<mts_msgs::DetectionProposal>("scenario_proposal", 10);
 
         m_dproposal_sub = this->create_subscription<mts_msgs::DetectionProposal>(
-            "scenario_proposal", 10, std::bind(&Vehicle::scenario_proposal_callback, this, std::placeholders::_1)
+            "/ext/scenario_proposal", 10, std::bind(&Vehicle::scenario_proposal_callback, this, std::placeholders::_1)
         );
 
         m_start_time = this->get_clock()->now();
