@@ -20,10 +20,11 @@ std::vector<float> extract_features(const DecisionData& situation)
     features.push_back(site.height);
     features.push_back(site.num_streets);
 
-    for (const mts_msgs::StreetData& s : site.streets)
-    {
-        features.push_back(static_cast<float>(s.width));
-    }
+    bool has_small_street = std::any_of(site.streets.begin(), site.streets.end(), [](const auto& s) {
+        return s.width < 2;
+    });
+
+    features.push_back(static_cast<int>(has_small_street));
 
     features.push_back(vehicles.size());
 

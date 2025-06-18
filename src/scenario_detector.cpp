@@ -530,14 +530,16 @@ Scenario ScenarioDetector::decision_tree(const DecisionData& data) const
 
 void ScenarioDetector::init_knn()
 {
-    // site.width | site.height | number streets | s1-4.width    | number vehicle
-    //     sw     |     sh      |      ns        | l | r | t | b |        ns 
+    // site.width | site.height | number streets | has small street    | number vehicle
+    //     sw     |     sh      |      ns        |       hss           |        ns 
     m_knn_data_set = {
-        { cf::ScenarioSituation{ {/*sw*/ 2.0, /*sh*/ 2.0, /*ns*/ 4.0, /*s*/ /*l*/ 2.0, /*r*/ 2.0, /*t*/ 2.0, /*b*/ 2.0, /*nv*/ 4.0 }, Scenario::S2 } },
-        { cf::ScenarioSituation{ {/*sw*/ 2.0, /*sh*/ 2.0, /*ns*/ 4.0, /*s*/ /*l*/ 2.0, /*r*/ 2.0, /*t*/ 2.0, /*b*/ 2.0, /*nv*/ 3.0 }, Scenario::S2 } },
-        { cf::ScenarioSituation{ {/*sw*/ 2.0, /*sh*/ 2.0, /*ns*/ 4.0, /*s*/ /*l*/ 2.0, /*r*/ 2.0, /*t*/ 2.0, /*b*/ 2.0, /*nv*/ 2.0 }, Scenario::S2 } },
-        { cf::ScenarioSituation{ {/*sw*/ 2.0, /*sh*/ 2.0, /*ns*/ 3.0, /*s*/ /*l*/ 2.0, /*r*/ 2.0, /*t*/ 0.0, /*b*/ 1.0, /*nv*/ 2.0 }, Scenario::S1 } },
-        { cf::ScenarioSituation{ {/*sw*/ 2.0, /*sh*/ 2.0, /*ns*/ 4.0, /*s*/ /*l*/ 2.0, /*r*/ 2.0, /*t*/ 2.0, /*b*/ 2.0, /*nv*/ 3.0 }, Scenario::S1 } }
+        { cf::ScenarioSituation{ {/*sw*/ 2.0, /*sh*/ 2.0, /*ns*/ 4.0, /*hss*/ 0.0, /*nv*/ 4.0 }, Scenario::S2 } },
+        { cf::ScenarioSituation{ {/*sw*/ 2.0, /*sh*/ 2.0, /*ns*/ 4.0, /*hss*/ 0.0, /*nv*/ 3.0 }, Scenario::S2 } },
+        { cf::ScenarioSituation{ {/*sw*/ 2.0, /*sh*/ 2.0, /*ns*/ 4.0, /*hss*/ 1.0, /*nv*/ 3.0 }, Scenario::S2 } },
+        { cf::ScenarioSituation{ {/*sw*/ 2.0, /*sh*/ 2.0, /*ns*/ 4.0, /*hss*/ 0.0, /*nv*/ 2.0 }, Scenario::S2 } },
+        { cf::ScenarioSituation{ {/*sw*/ 2.0, /*sh*/ 2.0, /*ns*/ 4.0, /*hss*/ 1.0, /*nv*/ 2.0 }, Scenario::S2 } },
+        { cf::ScenarioSituation{ {/*sw*/ 2.0, /*sh*/ 2.0, /*ns*/ 3.0, /*hss*/ 1.0, /*nv*/ 2.0 }, Scenario::S1 } },
+        { cf::ScenarioSituation{ {/*sw*/ 2.0, /*sh*/ 2.0, /*ns*/ 4.0, /*hss*/ 1.0, /*nv*/ 3.0 }, Scenario::S1 } }
     };
 
 }
