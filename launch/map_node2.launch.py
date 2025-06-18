@@ -22,7 +22,7 @@ from image2scene import output_event, output_event_streets
 def generate_launch_description():
 
     # Define image path using Pathlib - set image that is needed for this scene
-    image_path = script_dir / 'scenario_S1_colored.png'
+    image_path = script_dir / 'scenario_S2_colored.png'
 
     crossing_vals = output_event(str(image_path))
     street_vals = output_event_streets(str(image_path))
