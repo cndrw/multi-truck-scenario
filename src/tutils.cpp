@@ -145,9 +145,9 @@ int get_street(const mts_msgs::VehicleBaseData &vehicle)
     switch ((int)vehicle.direction)
     {
         case 0 || 360: street = 1; break;
-        case 90: street = 2; break;
+        case 90: street = 3; break;
         case 180: street = 0; break;
-        case 270: street = 3; break;
+        case 270: street = 2; break;
     }
     return street;
 }

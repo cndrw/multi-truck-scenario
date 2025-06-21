@@ -474,18 +474,18 @@ Scenario ScenarioDetector::scenario_classification(const DecisionData& data)
 
 void ScenarioDetector::init_decision_tree()
 {
-    m_dtree = std::make_shared<cf::TreeNode<DecisionData>>([](const DecisionData& data) {
+    m_dtree = std::make_shared<cf::TreeNode<DecisionData>>([this](const DecisionData& data) {
         return data.second.num_streets > 2;
     });
 
     m_dtree->no = std::make_shared<cf::TreeNode<DecisionData>>(Scenario::None); // potential Scenario s3
 
-    m_dtree->yes = std::make_shared<cf::TreeNode<DecisionData>>([](const DecisionData& data){
+    m_dtree->yes = std::make_shared<cf::TreeNode<DecisionData>>([this](const DecisionData& data){
         return data.first.size() == 4;
     });
 
     m_dtree->yes->yes = std::make_shared<cf::TreeNode<DecisionData>>(Scenario::S2);
-    m_dtree->yes->no = std::make_shared<cf::TreeNode<DecisionData>>([](const DecisionData& data){
+    m_dtree->yes->no = std::make_shared<cf::TreeNode<DecisionData>>([this](const DecisionData& data){
         // priority vehicle does NOT indicator left
         const auto& vehicles = data.first;
         const auto& priority_vehicle = *std::find_if(vehicles.begin(), vehicles.end(), [&vehicles](const auto& v){
@@ -497,12 +497,13 @@ void ScenarioDetector::init_decision_tree()
 
     m_dtree->yes->no->yes = std::make_shared<cf::TreeNode<DecisionData>>(Scenario::S2);
 
-    m_dtree->yes->no->no = std::make_shared<cf::TreeNode<DecisionData>>([](const DecisionData& data){
+    m_dtree->yes->no->no = std::make_shared<cf::TreeNode<DecisionData>>([this](const DecisionData& data){
         // street left of priority vehicle is small?
         const auto& vehicles = data.first;
         const auto& priority_vehicle = *std::find_if(vehicles.begin(), vehicles.end(), [&vehicles](const auto& v){
             return tutils::get_vehicle(vehicles, v, Side::Right) == VinFlags::Invalid;
         });
+
 
         const auto street_id = tutils::get_street(priority_vehicle);
         const auto street_id_left = tutils::get_street(street_id, Side::Left);
@@ -541,8 +542,13 @@ void ScenarioDetector::init_knn()
         { cf::ScenarioSituation{ {/*sw*/ 2.0, /*sh*/ 2.0, /*ns*/ 4.0, /*hss*/ 1.0, /*nv*/ 3.0 }, Scenario::S2 } },
         { cf::ScenarioSituation{ {/*sw*/ 2.0, /*sh*/ 2.0, /*ns*/ 4.0, /*hss*/ 0.0, /*nv*/ 2.0 }, Scenario::S2 } },
         { cf::ScenarioSituation{ {/*sw*/ 2.0, /*sh*/ 2.0, /*ns*/ 4.0, /*hss*/ 1.0, /*nv*/ 2.0 }, Scenario::S2 } },
+        { cf::ScenarioSituation{ {/*sw*/ 2.0, /*sh*/ 2.0, /*ns*/ 3.0, /*hss*/ 0.0, /*nv*/ 3.0 }, Scenario::S2 } },
+        { cf::ScenarioSituation{ {/*sw*/ 2.0, /*sh*/ 2.0, /*ns*/ 3.0, /*hss*/ 0.0, /*nv*/ 2.0 }, Scenario::S2 } },
+
         { cf::ScenarioSituation{ {/*sw*/ 2.0, /*sh*/ 2.0, /*ns*/ 3.0, /*hss*/ 1.0, /*nv*/ 2.0 }, Scenario::S1 } },
-        { cf::ScenarioSituation{ {/*sw*/ 2.0, /*sh*/ 2.0, /*ns*/ 4.0, /*hss*/ 1.0, /*nv*/ 3.0 }, Scenario::S1 } }
+        { cf::ScenarioSituation{ {/*sw*/ 2.0, /*sh*/ 2.0, /*ns*/ 4.0, /*hss*/ 1.0, /*nv*/ 2.0 }, Scenario::S1 } },
+        { cf::ScenarioSituation{ {/*sw*/ 2.0, /*sh*/ 2.0, /*ns*/ 4.0, /*hss*/ 1.0, /*nv*/ 3.0 }, Scenario::S1 } },
+        { cf::ScenarioSituation{ {/*sw*/ 2.0, /*sh*/ 2.0, /*ns*/ 3.0, /*hss*/ 1.0, /*nv*/ 3.0 }, Scenario::S1 } }
     };
 
 }
