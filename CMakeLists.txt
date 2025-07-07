@@ -24,6 +24,7 @@ find_package(std_msgs REQUIRED)
 find_package(nav_msgs REQUIRED)
 find_package(visualization_msgs REQUIRED)
 find_package(truck_msgs REQUIRED)
+find_package(tf2 REQUIRED)
 
 set(msg_files
   "msg/VehicleBaseData.msg"
@@ -60,7 +61,7 @@ add_executable(vehicle_node src/vehicle.cpp)
 
 # Abhängigkeiten setzen
 
-ament_target_dependencies(vehicle_node rclcpp geometry_msgs std_msgs truck_msgs)
+ament_target_dependencies(vehicle_node rclcpp geometry_msgs std_msgs truck_msgs tf2)
 target_include_directories(vehicle_node PRIVATE includes)
 target_link_libraries(vehicle_node scenario_lib truck_utils_lib)
 
@@ -69,6 +70,7 @@ target_include_directories(scenario_lib PRIVATE includes)
 target_link_libraries(scenario_lib truck_utils_lib)
 
 target_include_directories(truck_utils_lib PRIVATE includes)
+ament_target_dependencies(truck_utils_lib rclcpp)
 
 ament_target_dependencies(map_node rclcpp nav_msgs visualization_msgs)
 target_include_directories(map_node PRIVATE includes)

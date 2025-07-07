@@ -165,6 +165,8 @@ class Map : public rclcpp::Node
 
             if (value >= -128 && value <= 127)
             {
+                RCLCPP_INFO(get_logger(), "c: %d", (int)value);
+
                 if (value != GridColor::Grey)
                 {
                     static_map_colors.push_back(GridColor::Black);
@@ -564,3 +566,4 @@ int main(int argc, char * argv[])
   rclcpp::shutdown();
   return 0;
 }
+
